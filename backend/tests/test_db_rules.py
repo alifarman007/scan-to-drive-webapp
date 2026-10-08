@@ -8,24 +8,11 @@ import uuid
 
 import pytest
 from sqlalchemy.exc import DBAPIError, IntegrityError
-from sqlalchemy.orm import Session
 
-from app.db import engine
 from app.models import (
     Alert, AlertStatus, AlertType, Driver, Passenger, Trip, TripEvent,
     TripPhoto, TripStage, TripStatus, TripToken, Vehicle,
 )
-
-
-@pytest.fixture()
-def db():
-    conn = engine.connect()
-    outer = conn.begin()
-    session = Session(bind=conn, join_transaction_mode="create_savepoint")
-    yield session
-    session.close()
-    outer.rollback()
-    conn.close()
 
 
 def _uid() -> str:
