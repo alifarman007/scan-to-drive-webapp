@@ -147,12 +147,54 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
 
 - **Anyone holding the Start QR can choose "Others" and type any name and phone.** Nothing verifies a visitor. Mitigations in place: the
   trip is marked for review, everything is in the audit log, and `allow_visitors` can be switched off. Ask the company whether this is acceptable.
-- **Proposal, not yet confirmed (needed for the end-of-trip step):** a visitor confirms the end by repeating the **same phone number** they gave
-  at the start (the PDF's "same ID as the start" rule).
+- The proposal that a visitor confirms the end with the **same phone number** given at the start is now built (see the next section).
 - A blocked trip can only be cancelled for now. An admin "unlock" or "reset tries" action is not built.
 - Name look-ups show an employee's name to anyone who holds a valid QR (limited to 15 per trip). Behind Nginx the client IP will be the
   proxy's until forwarded headers are configured.
 - The employee list import and admin screens are not built yet; passengers exist only from the seed script until then.
+
+### 2026-10-08 (end of trip: driver end form, End QR, passenger end confirmation)
+
+- [x] `POST /api/trips/{id}/end` (driver, multipart): `end_km`, `end_place`, `photo` (end dashboard), optional `end_lat`/`end_lng`.
+      Trip must be `in_progress`; `end_km` must be greater than `start_km` (`422 END_KM_TOO_LOW`). Saves the photo as `trips/{id}/end.{ext}`.
+      Sets `end_time` (server time) and `distance_km`.
+      - **With a passenger:** status becomes `waiting_for_end_confirm` and the response carries a one-time **End QR**.
+      - **Without a passenger:** the trip completes at once (no tokens), and the car's `current_km` is updated.
+      - If `distance_km` is above the setting `high_km_limit_km`, a `high_km` alert is raised.
+- [x] `POST /api/trips/{id}/end-qr` (driver): new End QR (the old one stops). `409 TRIP_NOT_WAITING_END`, `423 TRIP_LOCKED` after too many wrong IDs.
+- [x] `GET /api/p/{token}` now handles **both** QR kinds. For an End QR it returns the summary: start/end km, distance, journey minutes,
+      both photos, and `confirm_as` (`employee` or `visitor`), so the page knows which box to show. `GET /api/p/{token}/photo/{kind}` serves
+      `start` or `end`. `GET /api/p/{token}/photo` still means the start photo.
+- [x] `POST /api/p/{token}/confirm-end`: body `{"passenger_type":"employee","employee_id":"EMP-2210"}` or
+      `{"passenger_type":"visitor","phone":"01712345678"}`. Must match the person who confirmed the start. Success: status `completed`,
+      `end_confirm_time` set, End QR used, car `current_km = end_km`, audit event `trip_completed`.
+- [x] A Start QR cannot be used on the End endpoint and the other way round (`409 WRONG_QR`).
+- [x] 29 new tests, **113 in total pass** in the sandbox.
+- [ ] **To verify on the developer machine:** unzip over the repo (keep `.env`), `python -m app.seed` (adds `high_km_limit_km`), `pytest -q`
+      (expect 113 passed). In Swagger: sign in as the driver, `POST /api/trips/{id}/end` for the running trip (with photo), copy the token from
+      `end_qr.url`, **log out of the driver token first**, then `GET /api/p/{token}` and `POST /api/p/{token}/confirm-end`.
+
+#### Decisions made in this step
+
+- **Visitor phone rule:** phones are compared after normalizing (digits only, a leading `00` dropped, `880...` turned into `0...`), so
+  `+880 1712-345678` equals `01712345678`. Implemented in `app/services/phones.py`.
+- **Wrong tries at the end** use the same limit (`wrong_id_limit`) but are counted separately from the start. A wrong employee ID or phone gives
+  `403 ID_MISMATCH` with `tries_left`. Using the wrong type of confirmation (an employee box for a visitor trip) is `422 WRONG_PASSENGER_TYPE`
+  and is not counted. At the limit the End QR is revoked, a `wrong_ids` alert is raised and the driver gets `423 TRIP_LOCKED`.
+- **No name lookup at the end:** the passenger must already know their ID, so the End QR cannot be used to list names.
+- The driver's own session is blocked from confirming the end too (`DRIVER_CANNOT_CONFIRM`, best effort as at the start).
+- The car's `current_km` changes **only when the trip completes** (PDF section 7). Locking the vehicle row when confirming avoids two
+  trips racing on it.
+- Error codes added: `END_KM_TOO_LOW` 422, `TRIP_NOT_WAITING_END` 409, `WRONG_QR` 409, `WRONG_PASSENGER_TYPE` 422, `ID_MISMATCH` 403,
+  `PHOTO_SAVE_FAILED` 503. `GET /trips/active` also returns `end_qr_blocked`.
+- `high_km_limit_km` (default 300) is a **placeholder**: the PDF names a high-km alert but no number. Ask the company.
+
+#### Weak points and open questions from this step
+
+- **If the passenger never confirms the end,** the trip stays in `waiting_for_end_confirm` and the driver and car stay blocked. Only an admin can
+  close it, and that action is not built yet. Same for a trip locked by wrong IDs at the end. Next piece, with the waiting-too-long alert.
+- A visitor's phone is not verified, so the end only proves the person knows the phone number typed at the start (which the driver may also know).
+- The driver can end a trip from anywhere; the optional GPS fields are stored but never checked.
 
 ## Database (PDF section 16)
 
@@ -232,10 +274,14 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | GET | `/api/trips/active` | driver | the driver's open trip or null, plus `start_qr_blocked` |
 | POST | `/api/trips/{id}/start-qr` | driver | new Start QR (old one stops working; `423` if the trip is locked by wrong IDs) |
 | POST | `/api/trips/{id}/cancel` | driver / admin | cancel before the passenger confirms (reason required) |
-| GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning the Start QR |
+| POST | `/api/trips/{id}/end` | driver | end the trip (multipart form + end photo); returns the End QR, or completes at once with no passenger |
+| POST | `/api/trips/{id}/end-qr` | driver | new End QR (old one stops working; `423` if locked) |
+| GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning a Start QR (trip details) or an End QR (summary) |
 | GET | `/api/p/{token}/photo` | anyone with the QR | start dashboard photo (only while the QR is valid) |
-| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (wrong IDs count toward the limit) |
+| GET | `/api/p/{token}/photo/{kind}` | anyone with the QR | `start` or `end` dashboard photo |
+| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR only; wrong IDs count toward the limit) |
 | POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
+| POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
 
@@ -264,9 +310,10 @@ backend/
   app/deps.py              DB session and role guards
   app/routers/auth.py      driver and admin sign-in
   app/routers/cars.py      car page
-  app/routers/trips.py     start trip, active trip, new Start QR, cancel
-  app/routers/passenger.py passenger pages: open QR, photo, lookup, confirm start
-  app/services/            audit log, settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules
+  app/routers/trips.py     start trip, active trip, new Start QR, cancel, end trip, new End QR
+  app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
+  app/services/            audit log, settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
+                           phone normalizing (phones.py)
   app/storage.py           photo storage (local folder now, Azure Blob later)
   app/errors.py            error format helper; app/schemas.py response shapes
   app/seed.py              development seed data
@@ -275,17 +322,16 @@ backend/
   tests/test_auth.py       sign-in, lockout and role-guard tests
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
+  tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
 frontend/                  not started
 ```
 
 ## Next steps
 
-1. Verify the passenger part on the developer machine (unchecked item above) and commit.
-2. Backend, next pieces in this order: end trip `POST /trips/{id}/end` (end km > start km, end photo, End QR, status
-   `waiting_for_end_confirm`; without passenger it completes right away); `GET /p/{token}` and `confirm-end` for the End QR (same
-   employee ID, or same phone for a visitor, completes the trip, updates the car's current km, calculates distance and time);
-   admin close of a stuck trip and unlock of a blocked trip; "Passenger can't scan" approval; alerts and background jobs (long trip,
-   waiting too long, reminders); admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
+1. Verify the end-of-trip part on the developer machine (unchecked item above) and commit.
+2. Backend, next pieces in this order: admin close of a stuck trip and unlock of a blocked trip (start or end);
+   "Passenger can't scan" approval; alerts and background jobs (long trip, waiting too long, reminders);
+   admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).

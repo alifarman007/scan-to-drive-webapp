@@ -53,18 +53,23 @@ def lookups_for_trip(db: Session, trip_id: int) -> int:
     )
 
 
-def resolve_token(db: Session, raw: str, kind: TripStage, *, lock: bool = False) -> tuple[TripToken, Trip]:
+def resolve_token(
+    db: Session, raw: str, expected: TripStage | None = None, *, lock: bool = False
+) -> tuple[TripToken, Trip]:
     """Return (token, trip) if the QR can be used now, otherwise raise a clear error.
 
+    `expected` is the kind of QR the endpoint is for (start or end); leave it out to accept either.
     lock=True keeps the rows locked until the end of the request, so two phones cannot
     confirm the same trip at the same moment.
     """
-    stmt = select(TripToken).where(TripToken.token_hash == hash_token(raw), TripToken.kind == kind)
+    stmt = select(TripToken).where(TripToken.token_hash == hash_token(raw))
     if lock:
         stmt = stmt.with_for_update()
     token = db.scalar(stmt)
     if token is None:
         raise api_error(404, "QR_INVALID", "This QR code is not valid")
+    if expected is not None and token.kind != expected:
+        raise api_error(409, "WRONG_QR", "This QR code is for a different step of the trip")
 
     trip_stmt = select(Trip).where(Trip.id == token.trip_id)
     if lock:
@@ -75,13 +80,13 @@ def resolve_token(db: Session, raw: str, kind: TripStage, *, lock: bool = False)
         raise api_error(410, "QR_USED", "This QR code was already used")
     if trip.status == TripStatus.cancelled:
         raise api_error(410, "TRIP_CANCELLED", "This trip was cancelled")
-    if is_locked(db, trip.id, kind):
+    if is_locked(db, trip.id, token.kind):
         raise api_error(423, "QR_BLOCKED", "Too many wrong IDs. This QR is blocked, please ask the driver.")
     if token.revoked_at is not None:
         raise api_error(410, "QR_REPLACED", "This QR code was replaced. Ask the driver to show the new one.")
     if token.expires_at <= datetime.now(timezone.utc):
         raise api_error(410, "QR_EXPIRED", "QR expired. Ask the driver to make a new one.")
-    if trip.status != REQUIRED_STATUS[kind]:
+    if trip.status != REQUIRED_STATUS[token.kind]:
         raise api_error(410, "TRIP_NOT_WAITING", "This trip is not waiting for confirmation")
     return token, trip
 

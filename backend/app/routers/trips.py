@@ -146,7 +146,10 @@ def active_trip(driver: Driver = Depends(current_driver), db: Session = Depends(
     blocked = bool(
         trip and trip.status == TripStatus.waiting_for_passenger and is_locked(db, trip.id, TripStage.start)
     )
-    return {"trip": trip_out(trip) if trip else None, "start_qr_blocked": blocked}
+    end_blocked = bool(
+        trip and trip.status == TripStatus.waiting_for_end_confirm and is_locked(db, trip.id, TripStage.end)
+    )
+    return {"trip": trip_out(trip) if trip else None, "start_qr_blocked": blocked, "end_qr_blocked": end_blocked}
 
 
 def _own_waiting_trip(db: Session, trip_id: int, driver: Driver) -> Trip:
@@ -207,3 +210,110 @@ def cancel_trip(
     log_event(db, request, "trip_cancelled", actor, trip_id=trip.id, detail={"reason": reason})
     db.commit()
     return {"trip": trip_out(trip)}
+
+
+def _own_trip_in_state(db: Session, trip_id: int, driver: Driver, status: TripStatus, lock: bool = False) -> Trip:
+    stmt = select(Trip).where(Trip.id == trip_id)
+    if lock:
+        stmt = stmt.with_for_update()
+    trip = db.scalar(stmt)
+    if trip is None or trip.driver_id != driver.id:  # only the driver of this trip (PDF D6)
+        raise api_error(404, "TRIP_NOT_FOUND", "Trip not found")
+    if trip.status != status:
+        names = {
+            TripStatus.in_progress: ("TRIP_NOT_IN_PROGRESS", "This trip is not in progress"),
+            TripStatus.waiting_for_end_confirm: ("TRIP_NOT_WAITING_END", "This trip is not waiting for the end confirmation"),
+        }
+        code, message = names[status]
+        raise api_error(409, code, message, status=trip.status.value)
+    return trip
+
+
+@router.post("/{trip_id}/end")
+def end_trip(
+    trip_id: int,
+    request: Request,
+    end_km: Annotated[int, Form(ge=0, le=MAX_KM)],
+    end_place: Annotated[str, Form(min_length=1, max_length=255)],
+    photo: Annotated[UploadFile, File(description="Live dashboard photo at the end")],
+    end_lat: Annotated[float | None, Form(ge=-90, le=90)] = None,
+    end_lng: Annotated[float | None, Form(ge=-180, le=180)] = None,
+    driver: Driver = Depends(current_driver),
+    db: Session = Depends(get_db),
+    storage: PhotoStorage = Depends(get_storage),
+):
+    """End form + end dashboard photo in ONE request (PDF 6.3 steps D6-D8, S5).
+
+    With a passenger: status Waiting for end confirm, and a one-time End QR is made.
+    Without a passenger: the trip is completed right away (PDF 6.4)."""
+    end_place = end_place.strip()
+    if not end_place:
+        raise api_error(422, "FIELD_REQUIRED", "End place is required")
+    data, ext = _read_photo(photo)  # fail fast before touching the database
+
+    trip = _own_trip_in_state(db, trip_id, driver, TripStatus.in_progress, lock=True)
+    if end_km <= trip.start_km:
+        raise api_error(422, "END_KM_TOO_LOW",
+                        f"End km must be more than the start km ({trip.start_km}). Please check the odometer.",
+                        start_km=trip.start_km)
+
+    now = datetime.now(timezone.utc)
+    distance = end_km - trip.start_km
+    trip.end_km, trip.end_place, trip.end_lat, trip.end_lng = end_km, end_place, end_lat, end_lng
+    trip.end_time = now
+    trip.distance_km = distance
+
+    photo_key = None
+    qr = None
+    try:
+        photo_key = f"trips/{trip.id}/end.{ext}"
+        storage.save(photo_key, data)
+        db.add(TripPhoto(trip_id=trip.id, kind=TripStage.end, file_url=photo_key))
+
+        if trip.with_passenger:
+            trip.status = TripStatus.waiting_for_end_confirm
+            url, expires_at = create_trip_token(
+                db, trip.id, TripStage.end, app_settings.get_int(db, "qr_expiry_minutes")
+            )
+            qr = {"url": url, "expires_at": expires_at}
+        else:
+            trip.status = TripStatus.completed
+            vehicle = db.scalar(select(Vehicle).where(Vehicle.id == trip.vehicle_id).with_for_update())
+            vehicle.current_km = end_km
+
+        if distance > app_settings.get_int(db, "high_km_limit_km"):
+            db.add(Alert(
+                trip_id=trip.id, vehicle_id=trip.vehicle_id, type=AlertType.high_km,
+                message=f"{trip.vehicle.car_code} trip {trip.trip_no} covered {distance} km. Check the photos and the route.",
+            ))
+
+        log_event(db, request, "trip_end_submitted" if trip.with_passenger else "trip_completed",
+                  f"driver:{driver.employee_id}", trip_id=trip.id, lat=end_lat, lng=end_lng,
+                  detail={"end_km": end_km, "distance_km": distance, "with_passenger": trip.with_passenger})
+        db.commit()
+    except OSError:
+        db.rollback()
+        raise api_error(503, "PHOTO_SAVE_FAILED", "The photo could not be saved. Please try again.")
+    except Exception:
+        db.rollback()
+        if photo_key:
+            storage.delete(photo_key)
+        raise
+
+    return {"trip": trip_out(trip), "end_qr": qr}
+
+
+@router.post("/{trip_id}/end-qr")
+def new_end_qr(
+    trip_id: int, request: Request,
+    driver: Driver = Depends(current_driver), db: Session = Depends(get_db),
+):
+    """'Make new QR' at the end: the old End QR stops working (also after a restart or on another phone)."""
+    trip = _own_trip_in_state(db, trip_id, driver, TripStatus.waiting_for_end_confirm)
+    if is_locked(db, trip.id, TripStage.end):
+        raise api_error(423, "TRIP_LOCKED", "Too many wrong IDs were entered. Please ask the admin.")
+    revoke_open_tokens(db, trip.id, TripStage.end)
+    url, expires_at = create_trip_token(db, trip.id, TripStage.end, app_settings.get_int(db, "qr_expiry_minutes"))
+    log_event(db, request, "end_qr_renewed", f"driver:{driver.employee_id}", trip_id=trip.id)
+    db.commit()
+    return {"end_qr": {"url": url, "expires_at": expires_at}}
