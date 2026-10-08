@@ -16,10 +16,12 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 from app.models.enums import TripStage, TripStatus, pg_enum
+from app.models.people import Driver, Passenger
+from app.models.vehicle import Vehicle
 
 # Trip numbers look like T-000458. The sequence is created in the first migration.
 trip_no_seq = Sequence("trip_no_seq", metadata=Base.metadata)
@@ -110,6 +112,10 @@ class Trip(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+    vehicle: Mapped[Vehicle] = relationship()
+    driver: Mapped[Driver] = relationship()
+    passenger: Mapped[Passenger | None] = relationship()
 
 
 class TripPhoto(Base):

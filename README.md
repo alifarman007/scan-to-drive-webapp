@@ -58,9 +58,49 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
       adds a user.
 - [x] 12 sign-in tests (25 tests in total pass in the sandbox) and a manual check against a running server
       (health, admin login, `/auth/me`, old password rejected).
-- [ ] **To verify on the developer machine:** `pip install pyjwt httpx`, add `SECRET_KEY` to `backend/.env`, run
-      `pytest -q`, start `uvicorn app.main:app --reload`, open `http://localhost:8000/api/docs`.
-- [ ] Git commits for the database part and the sign-in part.
+- [x] **Verified on the developer machine:** all 25 tests pass, admin login returns 200, Swagger UI works
+      (reported by the developer).
+- [ ] Git commits for the database part and the sign-in part (commands were given in chat).
+
+2026-10-08 (car page and start trip)
+- [x] `GET /api/cars/{car_code}?v=<sticker version>`: car page for the signed-in driver. Returns the car, the
+      last end km (hint for the start form), `can_start`, and the reason if blocked (maintenance, inactive, in use by
+      someone else, driver already has an open trip). Old sticker (wrong version) gives 410, unknown car 404.
+- [x] `POST /api/trips` (multipart form + photo): starts a trip. Enforces PDF rules 1-6: car active and free, driver has
+      no other open trip, start km not below the car's last end km, purpose required without passenger, live photo
+      required (must really be JPEG/PNG/WebP, max 5 MB). Big km gap (over `km_gap_limit_km`) is allowed but raises a
+      `km_gap` alert. With passenger: status `waiting_for_passenger` and a one-time Start QR link (only the hash is
+      stored, expiry from the `qr_expiry_minutes` setting). Without passenger: straight to `in_progress`, no QR.
+      The car row is locked during the start, and the database unique indexes are the final safety net (409).
+- [x] `GET /api/trips/active` (the driver's open trip), `POST /api/trips/{id}/start-qr` ("Make new QR", the old QR is
+      revoked), `POST /api/trips/{id}/cancel` (reason required; driver for own trip, or admin; only before the passenger
+      confirms).
+- [x] Photo storage behind an interface (`app/storage.py`, local `uploads/` folder in dev, Azure Blob later).
+- [x] Every step is written to the audit log with device, IP and GPS.
+- [x] 24 new tests (49 in total pass in the sandbox) and a live check with a real file upload.
+- [ ] To verify on the developer machine: `pip install python-multipart`, `pytest -q` (expect 49 passed), then try the
+      new endpoints in Swagger (`/api/docs`): sign in as a driver, **Authorize**, GET a car, POST a trip with a photo.
+
+### Decisions made while building the start-trip step
+
+- **The start photo travels in the same request as the start form** (`POST /trips` is multipart). The PDF says the step
+  is "not saved until the photo is uploaded", and a single request guarantees a trip never exists without its photo.
+  The PDF's separate `POST /trips/{id}/photos` endpoint is therefore not needed for the start photo.
+- **The car sticker QR link carries the sticker version:** `{app}/c/CAR-03?v=1`. The PDF says a replaced sticker must
+  stop working ("QR version number") but not how; the API rejects a link whose `v` differs from `vehicles.qr_version`.
+- **The raw Start QR code cannot be read back** (only its hash is stored). The app keeps the link it got from
+  `POST /trips`; after a restart or on another phone it calls `POST /trips/{id}/start-qr` to make a new one.
+- Error replies have the form `{"detail": {"code": "CAR_IN_USE", "message": "CAR-03 is in use by Karim H."}}` so the
+  app can react to the code and show the message.
+- `needs_review` is not set for no-passenger trips; reports will filter them by `with_passenger = false`.
+
+### Gaps in the PDF to confirm
+
+- A driver cannot cancel a **no-passenger** trip started by mistake (rule 11 only allows cancel before the passenger
+  confirms, and these trips have no confirmation). Today only an admin can close it.
+- "Purposes list" (PDF 11.2 Settings) is not built; purpose is free text for now.
+- Server-side code cannot prove a photo came from the live camera; the app must use the camera capture and the admin
+  compares photo and typed km.
 
 ## Database (PDF section 16)
 
@@ -102,7 +142,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx pytest
+pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 alembic upgrade head          # create/update tables
 python -m app.seed            # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
@@ -114,7 +154,8 @@ pip freeze > requirements.txt
 `backend/.env` values: `DATABASE_URL`, `SECRET_KEY` (generate with
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`), `ENVIRONMENT` (`development` or `production`;
 production refuses to start with a weak key). Optional: `DRIVER_TOKEN_DAYS` (30), `ADMIN_TOKEN_MINUTES` (480),
-`LOGIN_MAX_FAILURES` (5), `LOGIN_LOCKOUT_MINUTES` (15), `CORS_ORIGINS`.
+`LOGIN_MAX_FAILURES` (5), `LOGIN_LOCKOUT_MINUTES` (15), `CORS_ORIGINS`, `PUBLIC_BASE_URL` (QR links, default
+`http://localhost:3000`), `STORAGE_DIR` (photos, default `uploads`), `MAX_PHOTO_MB` (5).
 
 Change an admin password: `python -m app.set_password admin` (hidden prompt, 8-72 characters).
 Create a user: `python -m app.set_password mary --create --role viewer`.
@@ -131,6 +172,11 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/auth/driver/set-pin` | driver | first sign-in only; returns a token |
 | POST | `/api/auth/admin/login` | admin / viewer | username + password |
 | GET | `/api/auth/me` | signed in | who am I |
+| GET | `/api/cars/{car_code}?v=` | driver | car page: details, last end km, can start or why not |
+| POST | `/api/trips` | driver | start a trip (multipart form + dashboard photo) |
+| GET | `/api/trips/active` | driver | the driver's open trip or null |
+| POST | `/api/trips/{id}/start-qr` | driver | new Start QR (old one stops working) |
+| POST | `/api/trips/{id}/cancel` | driver / admin | cancel before the passenger confirms (reason required) |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
 
@@ -158,20 +204,27 @@ backend/
   app/security.py          bcrypt hashing and JWT tokens
   app/deps.py              DB session and role guards
   app/routers/auth.py      driver and admin sign-in
+  app/routers/cars.py      car page
+  app/routers/trips.py     start trip, active trip, new Start QR, cancel
+  app/services/            audit log, settings lookup, QR tokens, trip business rules
+  app/storage.py           photo storage (local folder now, Azure Blob later)
+  app/errors.py            error format helper; app/schemas.py response shapes
   app/seed.py              development seed data
   app/set_password.py      command to change/create admin passwords
   tests/test_db_rules.py   checks that the DB enforces the business rules
   tests/test_auth.py       sign-in, lockout and role-guard tests
+  tests/test_trips.py      car page and start-trip tests
 frontend/                  not started
 ```
 
 ## Next steps
 
-1. Verify the sign-in part on the developer machine (unchecked items above) and commit.
-2. Backend, next pieces in this order: car page (`GET /cars/{car_code}`) and start trip (`POST /trips`) with the
-   business rules; photo upload behind a storage interface (local folder in dev, Azure Blob later); one-time
-   Start/End QR tokens (store only the hash) and the passenger confirm endpoints; end trip, cancel and admin close;
-   alerts and background jobs; admin CRUD, import, reports and Excel/PDF export. Endpoint list: PDF section 15.
+1. Verify the start-trip part on the developer machine (unchecked item above) and commit.
+2. Backend, next pieces in this order: passenger pages `GET /p/{token}`, `POST /p/{token}/confirm-start`
+   (employee ID, wrong-ID limit, not from the driver's own session, sets `in_progress` and `journey_start_time`);
+   end trip `POST /trips/{id}/end` (end km > start km, end photo, End QR); `confirm-end` (same ID, completes the trip,
+   updates the car's current km, calculates distance); admin close; alerts and background jobs; admin CRUD, import,
+   reports and Excel/PDF export; serving photos through short-lived links. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger and admin screens
    (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).

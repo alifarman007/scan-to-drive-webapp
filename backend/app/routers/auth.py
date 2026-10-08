@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.deps import current_principal, get_db
 from app.models import AdminUser, Driver, RecordStatus, TripEvent
+from app.services.audit import log_event
 from app.security import (
     burn_time,
     create_access_token,
@@ -43,16 +44,8 @@ class AdminLogin(BaseModel):
 
 
 def _log(db: Session, request: Request, event: str, actor: str, detail: dict | None = None) -> None:
-    db.add(
-        TripEvent(
-            event=event,
-            actor=actor[:120],
-            device=(request.headers.get("user-agent") or "")[:255] or None,
-            ip=request.client.host if request.client else None,
-            detail=detail,
-        )
-    )
-    db.commit()  # commit now: failed attempts must be saved even though we raise next
+    # Commit now: failed attempts must be saved even though we raise an error next.
+    log_event(db, request, event, actor, detail=detail, commit=True)
 
 
 def _check_not_locked(db: Session, actor: str, ok_event: str, fail_event: str) -> None:
