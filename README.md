@@ -196,6 +196,23 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
 - A visitor's phone is not verified, so the end only proves the person knows the phone number typed at the start (which the driver may also know).
 - The driver can end a trip from anywhere; the optional GPS fields are stored but never checked.
 
+### 2026-10-08 (admin: close a stuck trip, unlock a blocked trip)
+
+- [x] `POST /api/admin/trips/{id}/close` (admin role only; body `reason`, optional `end_km`): any open trip (waiting for passenger, in progress,
+      waiting for end confirmation) becomes `closed_by_admin`, `needs_review = true`, all QR codes stop, the car and driver are free again.
+      Reason is required (`REASON_REQUIRED`). `409 TRIP_NOT_OPEN` if already finished.
+- [x] `POST /api/admin/trips/{id}/unlock` (admin only; body `reason`): resets the wrong-ID count of the blocked stage (start or end), solves the
+      `wrong_ids` alert; the driver can then make a new QR. `409 NOT_LOCKED` if the trip is not blocked. The history stays in the audit log
+      (`passenger_wrong_id` events).
+- [x] 15 new tests (`tests/test_admin_trips.py`), **128 in total pass**.
+- [ ] **To verify:** unzip over the repo, `pytest -q` (expect 128). In Swagger as admin: lock a trip with 5 wrong IDs, call `unlock`; or
+      end a trip, then call `close` and check the car is free for a new trip.
+
+Decisions: if an end km is known (driver sent it, or the admin types `end_km` for a trip without one) the trip keeps it and the car's
+`current_km` moves forward, never backwards; with no end km the car's km is unchanged. Closing writes an `admin_closed` alert that is already
+solved (a record for the exceptions list) and solves any open `wrong_ids` alert. Unlock only resets the blocked stage. Not built: a list of
+stuck trips for the admin (comes with the admin dashboard API), and "Passenger can't scan".
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -281,6 +298,8 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | GET | `/api/p/{token}/photo/{kind}` | anyone with the QR | `start` or `end` dashboard photo |
 | POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR only; wrong IDs count toward the limit) |
 | POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
+| POST | `/api/admin/trips/{id}/close` | admin | close any open trip with a reason (optional end km); car and driver are freed |
+| POST | `/api/admin/trips/{id}/unlock` | admin | reset wrong-ID tries of a blocked trip |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -311,6 +330,7 @@ backend/
   app/routers/auth.py      driver and admin sign-in
   app/routers/cars.py      car page
   app/routers/trips.py     start trip, active trip, new Start QR, cancel, end trip, new End QR
+  app/routers/admin_trips.py admin close and unlock of trips
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/services/            audit log, settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
                            phone normalizing (phones.py)
@@ -322,15 +342,15 @@ backend/
   tests/test_auth.py       sign-in, lockout and role-guard tests
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
+  tests/test_admin_trips.py admin close and unlock
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
 frontend/                  not started
 ```
 
 ## Next steps
 
-1. Verify the end-of-trip part on the developer machine (unchecked item above) and commit.
-2. Backend, next pieces in this order: admin close of a stuck trip and unlock of a blocked trip (start or end);
-   "Passenger can't scan" approval; alerts and background jobs (long trip, waiting too long, reminders);
+1. Verify the end-of-trip and admin close/unlock parts on the developer machine (unchecked items above) and commit.
+2. Backend, next pieces in this order: "Passenger can't scan" approval; alerts and background jobs (long trip, waiting too long, reminders);
    admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).

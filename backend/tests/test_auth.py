@@ -140,9 +140,10 @@ def test_driver_first_sign_in_sets_pin_then_logs_in(client, db):
 def test_driver_wrong_pin_and_lockout(client, db):
     d = make_driver(db, pin="1234")
     body = {"employee_id": d.employee_id, "pin": "0000"}
+    before = len(events(db, "driver_login_failed"))  # the dev database may already hold real failed logins
     for _ in range(5):
         assert client.post("/api/auth/driver/login", json=body).status_code == 401
-    assert len(events(db, "driver_login_failed")) == 5
+    assert len(events(db, "driver_login_failed")) - before == 5
     right = client.post("/api/auth/driver/login", json={"employee_id": d.employee_id, "pin": "1234"})
     assert right.status_code == 429
 
