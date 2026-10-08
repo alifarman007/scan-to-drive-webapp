@@ -53,6 +53,15 @@ class Trip(Base):
             "OR (end_km IS NOT NULL AND end_time IS NOT NULL)",
             name="ended_trip_has_end_data",
         ),
+        # Visitors (people without an employee ID) leave name + phone instead of a passenger link.
+        CheckConstraint(
+            "NOT is_visitor OR (visitor_name IS NOT NULL AND visitor_phone IS NOT NULL AND passenger_id IS NULL)",
+            name="visitor_has_details",
+        ),
+        CheckConstraint(
+            "is_visitor OR (visitor_name IS NULL AND visitor_phone IS NULL AND visitor_reason IS NULL)",
+            name="visitor_fields_only_for_visitors",
+        ),
         # PDF rules 1 and 3: one open trip per car and per driver, enforced by the DB.
         Index(
             "uq_trips_one_open_per_vehicle",
@@ -84,6 +93,11 @@ class Trip(Base):
     # NULL until the passenger confirms the start (or always NULL without passenger).
     passenger_id: Mapped[int | None] = mapped_column(ForeignKey("passengers.id"))
     with_passenger: Mapped[bool] = mapped_column(Boolean)
+    # Set when the passenger chose "Other" (not an EPIC employee) on the passenger page.
+    is_visitor: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    visitor_name: Mapped[str | None] = mapped_column(String(120))
+    visitor_phone: Mapped[str | None] = mapped_column(String(30))
+    visitor_reason: Mapped[str | None] = mapped_column(String(255))
     purpose: Mapped[str | None] = mapped_column(Text)
 
     start_km: Mapped[int] = mapped_column(Integer)

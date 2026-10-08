@@ -12,6 +12,7 @@ from app.config import settings
 class PhotoStorage(Protocol):
     def save(self, key: str, data: bytes) -> None: ...
     def delete(self, key: str) -> None: ...
+    def read(self, key: str) -> bytes: ...
 
 
 class LocalStorage:
@@ -31,6 +32,9 @@ class LocalStorage:
 
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)
+
+    def read(self, key: str) -> bytes:
+        return self._path(key).read_bytes()
 
 
 def get_storage() -> PhotoStorage:

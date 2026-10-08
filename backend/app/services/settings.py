@@ -9,6 +9,7 @@ DEFAULTS = {
     "long_trip_hours": 6,
     "km_gap_limit_km": 20,
     "waiting_too_long_minutes": 30,
+    "allow_visitors": 1,  # 1 = passengers may choose "Other" (visitor); 0 = employee ID only
 }
 
 

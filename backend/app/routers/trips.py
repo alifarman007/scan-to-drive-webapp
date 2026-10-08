@@ -18,6 +18,7 @@ from app.models import (
 from app.schemas import trip_out
 from app.services import settings as app_settings
 from app.services.audit import log_event
+from app.services.qr_access import is_locked
 from app.services.tokens import create_trip_token, revoke_open_tokens
 from app.services.trips import open_trip_for_driver, start_blocker
 from app.storage import PhotoStorage, detect_image_type, get_storage
@@ -142,7 +143,10 @@ def start_trip(
 def active_trip(driver: Driver = Depends(current_driver), db: Session = Depends(get_db)):
     """The driver's open trip (also after signing in on another phone), or null."""
     trip = open_trip_for_driver(db, driver.id)
-    return {"trip": trip_out(trip) if trip else None}
+    blocked = bool(
+        trip and trip.status == TripStatus.waiting_for_passenger and is_locked(db, trip.id, TripStage.start)
+    )
+    return {"trip": trip_out(trip) if trip else None, "start_qr_blocked": blocked}
 
 
 def _own_waiting_trip(db: Session, trip_id: int, driver: Driver) -> Trip:
@@ -161,6 +165,8 @@ def new_start_qr(
 ):
     """'Make new QR': the old Start QR stops working."""
     trip = _own_waiting_trip(db, trip_id, driver)
+    if is_locked(db, trip.id, TripStage.start):
+        raise api_error(423, "TRIP_LOCKED", "Too many wrong IDs were entered. Cancel this trip or ask the admin.")
     revoke_open_tokens(db, trip.id, TripStage.start)
     url, expires_at = create_trip_token(db, trip.id, TripStage.start, app_settings.get_int(db, "qr_expiry_minutes"))
     log_event(db, request, "start_qr_renewed", f"driver:{driver.employee_id}", trip_id=trip.id)

@@ -20,6 +20,7 @@ SETTINGS = [
     ("long_trip_hours", "6", "Hours in progress before a long-trip alert (PDF sketch: 6)"),
     ("km_gap_limit_km", "20", "Km gap over last end km that raises an alert (placeholder)"),
     ("waiting_too_long_minutes", "30", "Minutes waiting for a passenger before an alert (placeholder)"),
+    ("allow_visitors", "1", "1 = passenger page offers 'Other' (visitor) besides EPIC employee; 0 = employee ID only"),
 ]
 
 CAR_MODELS = ["Toyota Axio", "Toyota Allion", "Toyota Noah", "Toyota Premio", "Honda Grace"]

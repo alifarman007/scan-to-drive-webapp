@@ -78,8 +78,8 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
 - [x] Photo storage behind an interface (`app/storage.py`, local `uploads/` folder in dev, Azure Blob later).
 - [x] Every step is written to the audit log with device, IP and GPS.
 - [x] 24 new tests (49 in total pass in the sandbox) and a live check with a real file upload.
-- [ ] To verify on the developer machine: `pip install python-multipart`, `pytest -q` (expect 49 passed), then try the
-      new endpoints in Swagger (`/api/docs`): sign in as a driver, **Authorize**, GET a car, POST a trip with a photo.
+- [x] **Verified on the developer machine:** the developer reported everything working, including the Swagger checks
+      (start a trip with a photo, second trip blocked by the one-open-trip rule).
 
 ### Decisions made while building the start-trip step
 
@@ -102,6 +102,58 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
 - Server-side code cannot prove a photo came from the live camera; the app must use the camera capture and the admin
   compares photo and typed km.
 
+### 2026-10-08 (passenger side: open the Start QR, confirm, wrong-ID limit, visitors)
+
+- [x] `GET /api/p/{token}`: what the passenger sees after scanning the Start QR (car, driver, start km, places, time,
+      tries left, whether visitors are allowed). `GET /api/p/{token}/photo` serves the start dashboard photo while the QR is valid.
+- [x] `POST /api/p/{token}/lookup`: shows the employee's **name only** for a typed ID (PDF sketch P1), so a typo is caught.
+- [x] `POST /api/p/{token}/confirm-start`: body is either `{"passenger_type":"employee","employee_id":...}` or
+      `{"passenger_type":"visitor","name":...,"phone":...,"reason":...}`. Sets status `in_progress` and the journey start time
+      (server time), marks the QR used, writes the audit log. The QR works once.
+- [x] Wrong-ID limit (setting `wrong_id_limit`, default 5): at the limit the QR is blocked, the admin gets a `wrong_ids` alert.
+- [x] Migration `0002_visitor_passengers`: columns `trips.is_visitor`, `visitor_name`, `visitor_phone`, `visitor_reason`, plus two
+      CHECK constraints (a visitor needs name and phone and no employee link; visitor fields only on visitor trips).
+      New setting `allow_visitors` (1 or 0).
+- [x] 35 new tests (84 in total pass in the sandbox) and a live run against a real server.
+- [ ] **To verify on the developer machine:** unzip over the repo, `alembic upgrade head` (applies 0002), `python -m app.seed`
+      (adds the `allow_visitors` setting row; optional because the code defaults to 1), `pytest -q` (expect 84 passed), then in Swagger:
+      start a trip as a driver, copy the token part of `start_qr.url` (after `/p/`), call `GET /api/p/{token}`, `POST .../lookup`
+      with `EMP-2210`, then `POST .../confirm-start`. Try 5 wrong IDs on another trip to see the block.
+
+#### Decisions made in this step (from the developer's answers)
+
+- **Passenger page has two choices:** "Employee of EPIC" (employee ID only) or "Others" (name, phone number, reason of travel
+  optional). **The passenger chooses**, not the driver, because the driver may not know who is who. The front end must build
+  this choice; the API takes the `passenger_type` field.
+- **Visitor trips are marked `needs_review`** and shown in the exceptions report later. Visitor details are stored on the trip
+  (not added to the employee list). An admin setting `allow_visitors = 0` turns the "Others" option off without code changes.
+- **Wrong-ID limit is counted per trip and per stage** (start / end), over all of the trip's QR codes: making a new QR does **not**
+  give new tries. At the limit: tokens revoked, `wrong_ids` alert, `POST /trips/{id}/start-qr` returns `423 TRIP_LOCKED`,
+  `GET /trips/active` returns `start_qr_blocked: true`. The driver can still cancel the trip (reason required) and start again.
+  Start and end are counted separately, so typos at the start do not strand a running trip at the end.
+- **Name shown before confirming** (developer chose yes, name only). Wrong IDs in a lookup count toward the limit, and a trip allows at most
+  15 lookups (`429 TOO_MANY_LOOKUPS`) so a QR holder cannot list employee names by trying IDs.
+- **Not from the driver's own phone (PDF rule 9):** if the request carries a valid session token of the **trip's own driver**, it is
+  rejected (`403 DRIVER_CANNOT_CONFIRM`). This is best-effort: the passenger page has no login, so a driver using a second device
+  cannot be detected. The PDF accepts this limit. A driver also cannot be the passenger of the same trip (same employee ID,
+  `403 PASSENGER_IS_DRIVER`, not counted as a wrong try).
+- Employee IDs are matched trimmed and case-insensitively. An inactive employee gets the same "ID not found" as an unknown one.
+- The "short-lived link" for the start photo is the QR token itself (valid only while the QR is valid and unused).
+- Error codes the front end can react to: `QR_INVALID` 404, `QR_USED` 410, `QR_REPLACED` 410, `QR_EXPIRED` 410, `TRIP_CANCELLED` 410,
+  `TRIP_NOT_WAITING` 410, `QR_BLOCKED` 423, `ID_NOT_FOUND` 404 (with `tries_left`), `TOO_MANY_LOOKUPS` 429,
+  `DRIVER_CANNOT_CONFIRM` 403, `PASSENGER_IS_DRIVER` 403, `VISITORS_NOT_ALLOWED` 403.
+
+#### Weak points and open questions from this step
+
+- **Anyone holding the Start QR can choose "Others" and type any name and phone.** Nothing verifies a visitor. Mitigations in place: the
+  trip is marked for review, everything is in the audit log, and `allow_visitors` can be switched off. Ask the company whether this is acceptable.
+- **Proposal, not yet confirmed (needed for the end-of-trip step):** a visitor confirms the end by repeating the **same phone number** they gave
+  at the start (the PDF's "same ID as the start" rule).
+- A blocked trip can only be cancelled for now. An admin "unlock" or "reset tries" action is not built.
+- Name look-ups show an employee's name to anyone who holds a valid QR (limited to 15 per trip). Behind Nginx the client IP will be the
+  proxy's until forwarded headers are configured.
+- The employee list import and admin screens are not built yet; passengers exist only from the seed script until then.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -113,11 +165,12 @@ Rules enforced **in the database**:
 - `end_km > start_km`; purpose required when there is no passenger; a reason is required for
   `cancelled` / `closed_by_admin`; ended trips must have end km and end time.
 - One photo per stage (start/end) per trip; QR token hashes are unique.
+- Visitor trips need a name and phone and no employee link; visitor fields are only allowed on visitor trips.
 - `trip_events` is append-only: a trigger blocks UPDATE and DELETE.
 - Trip numbers come from a sequence: `T-000001`, `T-000002`, ... (6 digits, so no overflow).
 
 Rules that the **backend must still enforce** (not in the database): start km not below the car's
-last end km; km-gap alert; server-side times only; same passenger ID at start and end; confirmation
+last end km; km-gap alert; server-side times only; same passenger ID at start and end (end step not built yet); confirmation
 not allowed from the driver's own session; QR one-time use and expiry; wrong-ID limit; role checks;
 completed trips locked except admin corrections with a reason; never delete cars/people, only deactivate.
 
@@ -129,12 +182,14 @@ completed trips locked except admin corrections with a reason; never delete cars
 - `trip_events.trip_id` is nullable (so admin actions and settings changes can be logged) and
   `trip_events.detail` (JSONB) holds reasons or changes.
 - `alerts.note`, `alerts.resolved_at`; `admin_users.status`; `vehicles.reg_number` is unique.
+- `trips.is_visitor`, `visitor_name`, `visitor_phone`, `visitor_reason` (migration 0002, for passengers who are not EPIC employees).
 - `created_at` / `updated_at` columns on most tables.
 
 ### Assumptions to confirm
 
 - Default settings seeded: `qr_expiry_minutes=15`, `wrong_id_limit=5`, `long_trip_hours=6` come from the PDF;
   `km_gap_limit_km=20` and `waiting_too_long_minutes=30` are **placeholders** chosen by the author.
+  `allow_visitors=1` is the developer's choice (visitors allowed).
 - Drivers are seeded **without** a PIN; they set one on first sign-in (PDF 6.1). Admin and viewer
   passwords are random, printed once by the seed script (dev only).
 
@@ -174,9 +229,13 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | GET | `/api/auth/me` | signed in | who am I |
 | GET | `/api/cars/{car_code}?v=` | driver | car page: details, last end km, can start or why not |
 | POST | `/api/trips` | driver | start a trip (multipart form + dashboard photo) |
-| GET | `/api/trips/active` | driver | the driver's open trip or null |
-| POST | `/api/trips/{id}/start-qr` | driver | new Start QR (old one stops working) |
+| GET | `/api/trips/active` | driver | the driver's open trip or null, plus `start_qr_blocked` |
+| POST | `/api/trips/{id}/start-qr` | driver | new Start QR (old one stops working; `423` if the trip is locked by wrong IDs) |
 | POST | `/api/trips/{id}/cancel` | driver / admin | cancel before the passenger confirms (reason required) |
+| GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning the Start QR |
+| GET | `/api/p/{token}/photo` | anyone with the QR | start dashboard photo (only while the QR is valid) |
+| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (wrong IDs count toward the limit) |
+| POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
 
@@ -196,7 +255,7 @@ Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 day
 README.md                  this file
 docs/                      the project plan PDF
 backend/
-  alembic.ini, alembic/    migrations (versions/0001_initial_schema.py)
+  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -206,7 +265,8 @@ backend/
   app/routers/auth.py      driver and admin sign-in
   app/routers/cars.py      car page
   app/routers/trips.py     start trip, active trip, new Start QR, cancel
-  app/services/            audit log, settings lookup, QR tokens, trip business rules
+  app/routers/passenger.py passenger pages: open QR, photo, lookup, confirm start
+  app/services/            audit log, settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules
   app/storage.py           photo storage (local folder now, Azure Blob later)
   app/errors.py            error format helper; app/schemas.py response shapes
   app/seed.py              development seed data
@@ -214,19 +274,20 @@ backend/
   tests/test_db_rules.py   checks that the DB enforces the business rules
   tests/test_auth.py       sign-in, lockout and role-guard tests
   tests/test_trips.py      car page and start-trip tests
+  tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
 frontend/                  not started
 ```
 
 ## Next steps
 
-1. Verify the start-trip part on the developer machine (unchecked item above) and commit.
-2. Backend, next pieces in this order: passenger pages `GET /p/{token}`, `POST /p/{token}/confirm-start`
-   (employee ID, wrong-ID limit, not from the driver's own session, sets `in_progress` and `journey_start_time`);
-   end trip `POST /trips/{id}/end` (end km > start km, end photo, End QR); `confirm-end` (same ID, completes the trip,
-   updates the car's current km, calculates distance); admin close; alerts and background jobs; admin CRUD, import,
-   reports and Excel/PDF export; serving photos through short-lived links. Endpoint list: PDF section 15.
-3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger and admin screens
-   (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
+1. Verify the passenger part on the developer machine (unchecked item above) and commit.
+2. Backend, next pieces in this order: end trip `POST /trips/{id}/end` (end km > start km, end photo, End QR, status
+   `waiting_for_end_confirm`; without passenger it completes right away); `GET /p/{token}` and `confirm-end` for the End QR (same
+   employee ID, or same phone for a visitor, completes the trip, updates the car's current km, calculates distance and time);
+   admin close of a stuck trip and unlock of a blocked trip; "Passenger can't scan" approval; alerts and background jobs (long trip,
+   waiting too long, reminders); admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
+3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
+   screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
 
 ## Conventions for whoever continues

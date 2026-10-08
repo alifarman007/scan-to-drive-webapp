@@ -144,3 +144,30 @@ def test_audit_log_cannot_be_changed_or_deleted(db):
     db.flush()
     with pytest.raises(DBAPIError):
         db.execute(TripEvent.__table__.delete())
+
+
+def test_visitor_needs_name_and_phone(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), is_visitor=True)
+
+
+def test_visitor_with_name_but_no_phone_is_rejected(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), is_visitor=True, visitor_name="John")
+
+
+def test_visitor_trip_cannot_also_have_an_employee(db):
+    p = make_passenger(db)
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), is_visitor=True,
+                  visitor_name="John", visitor_phone="0171234567", passenger_id=p.id)
+
+
+def test_visitor_fields_only_for_visitors(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), visitor_name="John")
+
+
+def test_valid_visitor_trip_is_saved(db):
+    make_trip(db, make_vehicle(db), make_driver(db), is_visitor=True,
+              visitor_name="John", visitor_phone="0171234567")

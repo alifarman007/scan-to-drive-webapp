@@ -68,3 +68,23 @@ def current_principal(
     if claims.get("kind") == "driver":
         return current_driver(creds, db)
     return current_admin_user(creds, db)
+
+
+def optional_driver_id(creds: HTTPAuthorizationCredentials | None = Depends(bearer)) -> int | None:
+    """Id of the driver whose session is attached to this request, if any.
+
+    Used on public passenger pages to notice when the request comes from a driver's own
+    signed-in browser. A bad or missing token simply means "no driver".
+    """
+    if creds is None:
+        return None
+    try:
+        claims = decode_access_token(creds.credentials)
+    except jwt.PyJWTError:
+        return None
+    if claims.get("kind") != "driver":
+        return None
+    try:
+        return int(claims["sub"].split(":")[1])
+    except (KeyError, ValueError, IndexError):
+        return None
