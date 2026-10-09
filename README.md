@@ -282,6 +282,29 @@ only finished trips (completed, closed by admin), by the day the trip ended; "tr
 (also after the driver ended it), a car in maintenance without an open trip shows `maintenance`. Not built here: CSV/Excel/PDF export of the audit log and trip log (comes with the reports step), the
 single-car detail page (comes with cars CRUD; use the history filter for the car's trips meanwhile), live push updates (the front end can poll the dashboard every 15-30 seconds).
 
+### 2026-10-09 (admin: cars and QR stickers)
+
+PDF 8, 11.2 (Cars & QR) and section 15. **No database change.** New packages: `qrcode`, `reportlab`, `pillow`.
+Admins and viewers may look; only admins may change cars or print stickers (PDF section 4).
+
+- [x] `GET /api/admin/cars` (filters `q`, `status`): code, registration, model, current km, status, sticker version and link, total trips, total km, last trip, open trip.
+- [x] `GET /api/admin/cars/{id}`: the same plus the last 10 trips (full history: `GET /admin/trips?car_id=`).
+- [x] `POST /api/admin/cars`: add a car (`car_code` such as `CAR-11`, letters/digits/dashes, stored upper case; `reg_number`, `model`, `current_km`, `status`).
+      `409 CAR_CODE_EXISTS` / `REG_NUMBER_EXISTS` (registration compared ignoring case).
+- [x] `PATCH /api/admin/cars/{id}`: change `reg_number`, `model`, `status` (active / maintenance / inactive), or correct `current_km` (needs a `reason`; logged with before and after).
+      The car code and the sticker version cannot be set here. A car with an open trip cannot be set to maintenance or inactive (`409 CAR_HAS_OPEN_TRIP`).
+- [x] `POST /api/admin/cars/{id}/new-sticker`: lost sticker: sticker version +1, the **old sticker stops working at once** (`410 STICKER_OUTDATED` on the car page).
+- [x] `GET /api/admin/cars/{id}/qr.pdf?layout=sticker|a4`: printable sticker, 6 x 6 cm with the car code and "Scan to start trip" under the QR (`sticker`, one small page for a label printer),
+      or an A4 page with the sticker at the top left and a dotted cut line (`a4`, for an office printer). The QR holds only `{PUBLIC_BASE_URL}/c/{car_code}?v={version}`.
+- [x] Audit events: `car_created`, `car_updated`, `car_sticker_renewed`, `car_sticker_printed`.
+- [x] 25 new tests (`tests/test_admin_cars.py`), **207 in total pass**. The sticker PDF was rendered and looked at.
+- [ ] **To verify:** `pip install qrcode reportlab pillow`, `pytest -q` (expect 207). In Swagger as admin: `POST /api/admin/cars`, `GET /api/admin/cars`, open `/api/admin/cars/{id}/qr.pdf`
+      (Swagger shows a Download link; or call it with the admin token from the front end later), then `POST .../new-sticker` and check the old `?v=1` link now fails on `GET /api/cars/{code}?v=1`.
+      **Before printing real stickers, set `PUBLIC_BASE_URL` in `backend/.env` to the real address** (the QR text is built from it; the front end route `/c/{car_code}` is still to be built).
+
+Decisions: no delete (a car with history is set to inactive instead). The car code is permanent because it is printed on the sticker; a wrong code means adding a new car. The km correction exists
+for a replaced odometer; normal km changes only come from trips. Not built: a "Fuel and maintenance records" feature (PDF 'later' list).
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -325,7 +348,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler pytest
+pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler qrcode reportlab pillow pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 alembic upgrade head          # create/update tables
 python -m app.seed            # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
@@ -381,6 +404,12 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | GET | `/api/admin/trips/{id}` | admin / viewer | trip detail: people, map points, photo links, timeline, alerts |
 | GET | `/api/admin/photos/{trip_id}/{kind}` | signed link | dashboard photo, link valid 10 minutes |
 | GET | `/api/admin/audit` | admin | audit log search |
+| GET | `/api/admin/cars` | admin / viewer | car list with totals and open trip; filters `q`, `status` |
+| GET | `/api/admin/cars/{id}` | admin / viewer | one car, totals and last 10 trips |
+| POST | `/api/admin/cars` | admin | add a car |
+| PATCH | `/api/admin/cars/{id}` | admin | edit registration, model, status; correct km with a reason |
+| POST | `/api/admin/cars/{id}/new-sticker` | admin | new sticker version; the old sticker stops working |
+| GET | `/api/admin/cars/{id}/qr.pdf` | admin | printable QR sticker (`layout=sticker` or `a4`) |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -413,9 +442,11 @@ backend/
   app/routers/trips.py     start trip, active trip, new Start QR, cancel, end trip, new End QR
   app/routers/admin_trips.py admin close, unlock, approvals
   app/routers/admin_alerts.py alerts list and solve
+  app/routers/admin_cars.py cars list, add / edit, new sticker version, sticker PDF
   app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/worker.py            background worker (alert checks every minute)
+  app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
   app/services/timeutil.py Bangladesh days for dashboards and filters
   app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
                            phone normalizing (phones.py)
@@ -428,6 +459,7 @@ backend/
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
   tests/test_admin_trips.py admin close and unlock
+  tests/test_admin_cars.py cars and stickers
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -437,8 +469,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above (admin dashboard and history) on the developer machine and commit.
-2. Backend, next pieces in this order: admin CRUD (cars and QR sticker PDF, drivers with PIN reset, passengers with Excel import, users, settings), then reports and Excel/PDF export. Endpoint list: PDF section 15.
+1. Verify the unchecked items above (admin cars and stickers) on the developer machine and commit.
+2. Backend, next pieces in this order: admin CRUD for drivers (with PIN reset), passengers (with Excel import), users and settings, then reports and Excel/PDF export. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
