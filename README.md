@@ -328,6 +328,24 @@ PDF 11.2 (Drivers and Passengers pages). No database change. New package: `openp
 Notes: nothing is ever deleted, only set inactive. An employee ID is permanent (history and QR flows use it). Drivers and passengers are separate lists, so a driver who also rides as a
 passenger needs an entry in both. Admin users and Settings are the remaining admin pages.
 
+### 2026-10-09 (admin: users and settings)
+
+PDF 11.2 (Users and Settings pages). No database change, no new package. Users page is admin only. Settings can be seen by admin and viewer, changed by admin only.
+
+- [x] Users: `GET /api/admin/users`, `POST /api/admin/users` (username, role admin or viewer, password 8-72 characters), `PATCH /api/admin/users/{id}` (role and/or active/inactive),
+      `POST /api/admin/users/{id}/reset-password`. Usernames are not case-sensitive for the duplicate check and may use letters, numbers, dot, dash and underscore.
+- [x] Nobody is deleted, only set inactive. A deactivated account is signed out at once. An admin cannot demote or deactivate their own account, so there is always someone who can sign in
+      (another admin can still do it). `POST /api/admin/users/me/password` lets anyone signed in (admin or viewer) change their own password with the current one.
+- [x] Settings: `GET /api/admin/settings` lists each setting with its value, default, allowed range and a plain label. `PATCH /api/admin/settings` takes `{"values": {"qr_expiry_minutes": 10}}`.
+      Each value is range-checked (for example, yes/no settings only 0 or 1). If one value is bad, nothing is saved. Saving the same value again does nothing.
+- [x] Changes take effect straight away because the trip, QR and alert code already read the values from the settings table.
+- [x] Audit events: `admin_user_added`, `admin_user_changed`, `admin_password_reset`, `admin_password_changed`, `settings_changed` (old and new value for each key). Passwords are never written to the log.
+- [x] 11 new tests (`tests/test_admin_users_settings.py`), 238 in total pass in the sandbox.
+- [ ] To verify: `pytest -q` (expect 238, or 237 passed and 1 skipped without `pdftotext`). In Swagger as admin: add a viewer, sign in as that viewer, open the settings (works) and try to change one (403);
+      change `qr_expiry_minutes` as admin and look at the audit log for `settings_changed`; reset the viewer's password and sign in with the new one.
+
+Notes: a password reset does not clear a lockout from too many wrong tries; the lock ends by itself after 15 minutes. Reports with Excel/PDF export are the last backend piece.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -441,6 +459,13 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/admin/passengers` | admin | add an employee |
 | PATCH | `/api/admin/passengers/{id}` | admin | edit employee, set active / inactive |
 | POST | `/api/admin/passengers/import` | admin | import or update employees from an Excel file (`?dry_run=true` to preview) |
+| GET | `/api/admin/users` | admin | list admin and viewer accounts |
+| POST | `/api/admin/users` | admin | add an account |
+| PATCH | `/api/admin/users/{id}` | admin | change role, set active / inactive |
+| POST | `/api/admin/users/{id}/reset-password` | admin | set a new password for someone |
+| POST | `/api/admin/users/me/password` | admin / viewer | change my own password |
+| GET | `/api/admin/settings` | admin / viewer | all settings with value, default and allowed range |
+| PATCH | `/api/admin/settings` | admin | change one or more settings (logged) |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -478,6 +503,7 @@ backend/
   app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/worker.py            background worker (alert checks every minute)
+  app/routers/admin_users.py admin/viewer accounts; app/routers/admin_settings.py settings page
   app/services/people_import.py reads the passenger Excel sheet
   app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
   app/services/timeutil.py Bangladesh days for dashboards and filters
@@ -494,6 +520,7 @@ backend/
   tests/test_admin_trips.py admin close and unlock
   tests/test_admin_cars.py cars and stickers
   tests/test_admin_people.py drivers, passengers, import
+  tests/test_admin_users_settings.py users and settings pages
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -503,8 +530,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above (admin drivers, passengers and import) on the developer machine and commit.
-2. Backend, next pieces in this order: admin users and settings pages, then reports and Excel/PDF export. Endpoint list: PDF section 15.
+1. Verify the unchecked items above (admin users and settings) on the developer machine and commit.
+2. Backend, last piece: reports and Excel/PDF export (exceptions, km per car and per driver, trip log). Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
