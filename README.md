@@ -380,6 +380,44 @@ PDF 11.3 (Reports), section 15 (`/admin/reports/{name}`) and the "purposes list"
 Known gap: the built-in PDF font has no Bangla letters, so Bangla names or places would show as empty boxes in PDF files (Excel is fine). To fix it, put a Bangla font file (for example Noto Sans Bengali)
 on the server and set `PDF_FONT_PATH` (and optionally `PDF_FONT_BOLD_PATH`) in `.env`. Not tested with a real Bangla font yet. The backend API list in the PDF is now complete.
 
+### 2026-10-09 (frontend step 1: foundation, look and feel)
+
+Design agreed from the mockups (Design canvas "Scan-to-Drive UI mockups"). Frontend plan, one step at a time:
+1 foundation, 2 driver sign-in, 3 driver trip flow, 4 passenger pages, 5 admin dashboard, 6 trip history and detail,
+7 admin lists (cars, drivers, passengers, alerts, audit), 8 reports, users, settings, 9 polish, phone test over HTTPS, Docker and Azure.
+
+- [x] `frontend/` set up: Next.js 16.3 (App Router, TypeScript), React 19.3, Tailwind CSS 4.3, ESLint. Exact versions pinned in `package.json`.
+- [x] Colours from the Epic website: navy `#1C2E6F` (sidebar, headers), Epic blue `#284DAE` (main buttons), signal blue `#155DFC` (focus, live,
+      last odometer digit). All colours are CSS variables in `src/app/globals.css`, with a matching dark set.
+- [x] Status colours, the same everywhere: green available, blue on trip, amber waiting, red alert, grey maintenance / inactive.
+- [x] Fonts: Poppins (headings, same as the Epic website), Plus Jakarta Sans (text), Geist Mono (km, trip numbers, times), Hind Siliguri (Bangla).
+      They come from Fontsource packages and are bundled with the app, so nothing is loaded from Google (Google Fonts was not reachable from the
+      build machine, and the company server may block it too).
+- [x] Fluid sizes: text and spacing grow smoothly from phone to laptop with `clamp()` tokens in Tailwind's theme (`text-*`, `px-gutter`, `gap-section`).
+      The `fluid-tailwind` plugin was not used because it only supports Tailwind 3.
+- [x] Light / dark: follows the computer's setting, with a switch (moon / sun). The page cross-fades when switching.
+- [x] English / Bangla: English by default, EN / বাং switch everywhere, remembered in a cookie for a year. No `/en` or `/bn` in the address, so the
+      QR links (`/c/{car}`, `/p/{token}`) stay short. Texts are in `frontend/messages/en.json` and `bn.json`.
+- [x] Shared pieces in `src/components/ui/`: Button, Input / Field, Card, StatusChip, LiveDot, Odometer, CountdownRing, Reveal / Stagger, ThemeToggle,
+      LanguageSwitch. Built on Radix (keyboard and screen-reader support) in the shadcn/ui style, but written by hand: the shadcn CLI needs its own
+      website, which was not reachable.
+- [x] Animations (Motion library): odometer digits roll to the new value, cards rise in one after another, QR ring counts down and turns amber in the
+      last minute, live dots pulse, buttons press in, the menu highlight slides, the phone menu slides in. All of it is switched off when the phone
+      or computer has "reduce motion" turned on.
+- [x] Admin frame: navy sidebar on laptops, slide-in menu on phones, top bar with search box, language and theme switch. Dashboard shows the layout with
+      loading placeholders (live data in step 5). Pages not built yet say which step brings them.
+- [x] Driver overtime: in the sidebar with a "Phase 2" tag. Its page explains what is planned (hours beyond the shift, monthly totals, approve and
+      export for payroll) with a faded preview table of sample numbers.
+- [x] Start page (`/`): driver or transport office, and a note for passengers. `/styleguide` shows every shared piece (development only).
+- [x] The browser only calls the Next.js server; `/api/...` is passed on to FastAPI (`BACKEND_URL` in `frontend/.env.local`), so no CORS setup is needed.
+- [x] Checked in the sandbox: lint, type check and production build pass; pages looked at in Chromium at phone (390 px) and laptop (1366-1440 px)
+      sizes, light and dark, English and Bangla; menu, theme and language switches clicked through. No browser errors.
+- [ ] To verify: install Node.js 22 LTS, then the commands under "How to run the frontend". Open `/`, `/admin`, `/admin/overtime` and `/styleguide`;
+      try the phone size in the browser's device toolbar (F12), the moon button and EN / বাং.
+
+Notes: admin pages are not protected yet; sign-in comes with the admin login (step 5). The Epic logo is not in the app yet (a placeholder mark is
+used); put the logo file in `frontend/public/` when we have it. Bangla texts need a read-through by a native speaker.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -444,6 +482,19 @@ Create a user: `python -m app.set_password mary --create --role viewer`.
 
 New migration after changing models: `alembic revision --autogenerate -m "message"`, then **review it**
 (autogenerate does not handle sequences, triggers or dropping enum types), and run `alembic check`.
+
+## How to run the frontend (from `frontend/`, PowerShell)
+
+Needs Node.js 22 LTS (Next.js 16 needs 20.9 or newer). Run the backend first, in its own window.
+
+```powershell
+npm ci                        # first time, and after package.json changes
+copy .env.example .env.local  # first time only; BACKEND_URL=http://localhost:8000
+npm run dev                   # http://localhost:3000
+npm run lint                  # code checks
+npm run typecheck             # TypeScript checks
+npm run build                 # production build (what the server will run)
+```
 
 ## API so far
 
@@ -567,16 +618,21 @@ backend/
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
-frontend/                  not started
+frontend/                  Next.js app
+  messages/en.json, bn.json  all texts, English and Bangla
+  src/app/globals.css      colours (light and dark), fonts, fluid sizes
+  src/app/                 pages: / (start), /admin/*, /driver, /styleguide (development only)
+  src/components/ui/       shared pieces: Button, Input, Card, StatusChip, Odometer, CountdownRing, Reveal, ThemeToggle, LanguageSwitch
+  src/components/admin/    admin frame (sidebar, top bar) and the menu list
+  src/i18n/                language from the cookie (next-intl)
 ```
 
 ## Next steps
 
-1. Verify the unchecked items above (admin users and settings, reports) on the developer machine and commit.
-2. Backend API from PDF section 15 is complete. Still open on the backend side: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
-3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
-   screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
-4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
+1. Verify the unchecked items above (frontend step 1) on the developer machine and commit.
+2. Frontend step 2: driver sign-in (employee ID + PIN, choose a PIN on first sign-in) and how the sign-in is kept on the phone.
+3. Then steps 3-9 as listed in the frontend step 1 entry.
+4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 
 ## Conventions for whoever continues
 

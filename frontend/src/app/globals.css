@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+/* Dark mode follows the "dark" class that next-themes puts on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------------------------
+   Colour tokens. Brand colours come from epicgroup.global:
+   navy #1C2E6F (headers, sidebar), Epic blue #284DAE (main buttons), signal blue #155DFC (focus, live).
+   Surfaces, text and status colours switch between light and dark below.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --border: #e3e8f3;
+  --border-strong: #c9d3ea;
+  --text: #0f1a3d;
+  --title: #1c2e6f;
+  --muted: #5a6478;
+  --soft: #e6ecfa;
+  --bay: #eef1f6;
+  --accent: #284dae;
+  --accent-hover: #1f3f94;
+  --accent-text: #ffffff;
+  --ring: #155dfc;
+  --ring-soft: #dce6ff;
+  --side: #1c2e6f;
+  --side-text: #c9d3ea;
+  --side-active: #2b3f85;
+  --odo-tile: #0f1a3d;
+  --odo-frame: #1c2e6f;
+
+  --ok-bg: #dcf3ea;   --ok-fg: #0b6e4f;   --ok-dot: #0e8a5f;
+  --trip-bg: #e6ecfa; --trip-fg: #1c2e6f; --trip-dot: #155dfc;
+  --wait-bg: #fef1d6; --wait-fg: #8a4b08; --wait-dot: #e59a1a;
+  --bad-bg: #fde6ea;  --bad-fg: #a3182f;  --bad-dot: #d93250;
+  --off-bg: #eef1f6;  --off-fg: #475066;  --off-dot: #8a93a8;
+
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0a1030;
+  --card: #111a45;
+  --border: #223066;
+  --border-strong: #33437d;
+  --text: #e7ebf6;
+  --title: #ffffff;
+  --muted: #9aa6c6;
+  --soft: #1a2557;
+  --bay: #0d1540;
+  --accent: #3f66d8;
+  --accent-hover: #5277e0;
+  --accent-text: #ffffff;
+  --ring: #7d9bf5;
+  --ring-soft: #1f2f6e;
+  --side: #070c26;
+  --side-text: #9aa6c6;
+  --side-active: #1c2e6f;
+  --odo-tile: #050a22;
+  --odo-frame: #1c2e6f;
+
+  --ok-bg: #0e3a2e;   --ok-fg: #7fe0b8;   --ok-dot: #2bb683;
+  --trip-bg: #1c2a66; --trip-fg: #a9beff; --trip-dot: #4f86ff;
+  --wait-bg: #3d2a08; --wait-fg: #f7c266; --wait-dot: #e59a1a;
+  --bad-bg: #4a1220;  --bad-fg: #ff9db0;  --bad-dot: #ff5c7a;
+  --off-bg: #1e2647;  --off-fg: #aeb6cc;  --off-dot: #8a93a8;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-title: var(--title);
+  --color-muted: var(--muted);
+  --color-soft: var(--soft);
+  --color-bay: var(--bay);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-text: var(--accent-text);
+  --color-ring: var(--ring);
+  --color-ring-soft: var(--ring-soft);
+  --color-side: var(--side);
+  --color-side-text: var(--side-text);
+  --color-side-active: var(--side-active);
+  --color-odo-tile: var(--odo-tile);
+  --color-odo-frame: var(--odo-frame);
+
+  --color-ok-bg: var(--ok-bg);     --color-ok-fg: var(--ok-fg);     --color-ok-dot: var(--ok-dot);
+  --color-trip-bg: var(--trip-bg); --color-trip-fg: var(--trip-fg); --color-trip-dot: var(--trip-dot);
+  --color-wait-bg: var(--wait-bg); --color-wait-fg: var(--wait-fg); --color-wait-dot: var(--wait-dot);
+  --color-bad-bg: var(--bad-bg);   --color-bad-fg: var(--bad-fg);   --color-bad-dot: var(--bad-dot);
+  --color-off-bg: var(--off-bg);   --color-off-fg: var(--off-fg);   --color-off-dot: var(--off-dot);
+}
+
+@theme {
+  /* Fixed brand colours (same in light and dark). */
+  --color-navy: #1c2e6f;
+  --color-navy-2: #2b3f85;
+  --color-epic: #284dae;
+  --color-signal: #155dfc;
+  --color-ink: #0f1a3d;
+  --color-mist: #f4f6fb;
+  --color-sky: #9fb4f5;
+
+  /* Fonts (self-hosted through Fontsource, see layout.tsx). Bangla letters fall through to Hind Siliguri. */
+  --font-sans: "Plus Jakarta Sans Variable", "Hind Siliguri", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", "Hind Siliguri", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Fluid type: every size grows smoothly from a 360 px phone to a 1440 px laptop (no jumps at breakpoints). */
+  --text-xs: clamp(0.72rem, 0.7rem + 0.1vw, 0.78rem);
+  --text-xs--line-height: 1.4;
+  --text-sm: clamp(0.8125rem, 0.79rem + 0.12vw, 0.875rem);
+  --text-sm--line-height: 1.45;
+  --text-base: clamp(0.9375rem, 0.9rem + 0.18vw, 1rem);
+  --text-base--line-height: 1.55;
+  --text-lg: clamp(1.05rem, 1rem + 0.25vw, 1.125rem);
+  --text-lg--line-height: 1.5;
+  --text-xl: clamp(1.15rem, 1.05rem + 0.45vw, 1.3rem);
+  --text-xl--line-height: 1.35;
+  --text-2xl: clamp(1.35rem, 1.2rem + 0.7vw, 1.6rem);
+  --text-2xl--line-height: 1.25;
+  --text-3xl: clamp(1.6rem, 1.35rem + 1.1vw, 2rem);
+  --text-3xl--line-height: 1.2;
+  --text-4xl: clamp(1.9rem, 1.5rem + 1.8vw, 2.5rem);
+  --text-4xl--line-height: 1.12;
+  --text-5xl: clamp(2.3rem, 1.7rem + 2.8vw, 3.25rem);
+  --text-5xl--line-height: 1.05;
+
+  /* Fluid spacing: px-gutter, gap-section, py-section ... */
+  --spacing-gutter: clamp(1rem, 0.6rem + 2vw, 2rem);
+  --spacing-section: clamp(1.1rem, 0.8rem + 1.4vw, 1.75rem);
+
+  --radius-control: 0.875rem;
+  --radius-card: 1.25rem;
+  --radius-panel: 1.5rem;
+
+  --shadow-lift: 0 12px 32px rgb(28 46 111 / 0.12);
+  --shadow-press: 0 10px 24px rgb(40 77 174 / 0.35);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Bangla text reads better a little larger and with more line height. */
+  :lang(bn) body {
+    font-size: 1.03em;
+    line-height: 1.65;
+  }
+}
+
+/* Smooth light/dark switch (View Transitions; browsers without it switch instantly). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* Loading placeholder with a soft moving shine. */
+@utility skeleton {
+  background: linear-gradient(90deg, var(--soft) 0%, var(--bay) 45%, var(--soft) 90%);
+  background-size: 220% 100%;
+  animation: skeleton-shine 1.6s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes skeleton-shine {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

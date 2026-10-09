@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Scan-to-Drive",
+    "company": "Epic Group",
+    "tagline": "Company car trips, logged with a scan."
+  },
+  "common": {
+    "language": "Language",
+    "theme": "Theme",
+    "lightDark": "Switch light or dark",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "search": "Search",
+    "searchHint": "Car, trip, driver, passenger…",
+    "comingSoon": "Coming soon",
+    "phase2": "Phase 2",
+    "km": "km",
+    "backHome": "Back to start"
+  },
+  "home": {
+    "eyebrow": "Scan-to-Drive · Epic Group",
+    "title": "Every company trip, logged with one scan",
+    "lead": "Drivers scan the car, passengers confirm with their ID, and the transport office sees every trip live.",
+    "driver": "I am a driver",
+    "driverHint": "Sign in with your employee ID and PIN",
+    "admin": "Transport office",
+    "adminHint": "Dashboard, trips, cars and reports",
+    "passengerNote": "Passenger? Scan the QR code the driver shows you. No sign-in needed."
+  },
+  "placeholder": {
+    "title": "This screen is being built",
+    "body": "It arrives in step {step} of the frontend build.",
+    "driverTitle": "Driver sign-in comes next",
+    "driverBody": "The driver screens are built in steps 2 and 3."
+  },
+  "nav": {
+    "main": "Main menu",
+    "dashboard": "Dashboard",
+    "trips": "Trip history",
+    "cars": "Cars",
+    "drivers": "Drivers",
+    "passengers": "Passengers",
+    "reports": "Reports",
+    "alerts": "Alerts",
+    "audit": "Audit log",
+    "overtime": "Driver overtime",
+    "users": "Users",
+    "settings": "Settings"
+  },
+  "overtime": {
+    "title": "Driver overtime",
+    "badge": "Planned for Phase 2",
+    "lead": "Overtime will be worked out from the trips drivers already log, so nobody has to fill in a separate sheet.",
+    "point1Title": "Hours beyond the shift",
+    "point1Body": "Each driver's trip times compared with their working hours, day by day.",
+    "point2Title": "Monthly overtime per driver",
+    "point2Body": "Totals for the month, with the trips behind every hour.",
+    "point3Title": "Ready for payroll",
+    "point3Body": "Approve overtime and export it to Excel for HR and accounts.",
+    "previewLabel": "Preview with sample numbers",
+    "colDriver": "Driver",
+    "colDays": "Days",
+    "colHours": "Overtime",
+    "colStatus": "Status",
+    "statusPending": "To approve",
+    "statusApproved": "Approved",
+    "note": "Tell us your shift rules (start time, end time, weekends, holidays) and we will plan this with you."
+  },
+  "dashboard": {
+    "greeting": "Good morning",
+    "skeletonNote": "Live numbers arrive in step 5. This is the layout."
+  },
+  "styleguide": {
+    "title": "Style guide",
+    "lead": "Every shared piece of the interface in one place. Only shown while developing."
+  },
+  "status": {
+    "available": "Available",
+    "on_trip": "On trip",
+    "waiting": "Waiting",
+    "alert": "Alert",
+    "maintenance": "Maintenance",
+    "inactive": "Inactive"
+  }
+}
