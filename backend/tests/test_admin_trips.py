@@ -190,3 +190,17 @@ def test_unlock_a_trip_that_is_not_blocked(client, db):
 def test_unlock_needs_a_reason(client, db):
     _, _, _, trip_id = block_end(client, db)
     assert unlock(client, make_admin(db), trip_id, reason=" ").status_code == 422
+
+
+def test_close_ignores_end_km_zero_and_a_repeated_value(client, db):
+    # Swagger sends "end_km": 0 in its example body; that must not block the close.
+    driver, car, _, trip_id = running_trip(client, db)
+    end(client, driver, trip_id)
+    r = close(client, make_admin(db), trip_id, end_km=0)
+    assert r.status_code == 200 and r.json()["trip"]["end_km"] == 45038
+
+
+def test_close_accepts_the_same_end_km_again(client, db):
+    driver, car, _, trip_id = running_trip(client, db)
+    end(client, driver, trip_id)
+    assert close(client, make_admin(db), trip_id, end_km=45038).status_code == 200

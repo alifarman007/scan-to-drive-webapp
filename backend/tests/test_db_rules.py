@@ -171,3 +171,23 @@ def test_visitor_fields_only_for_visitors(db):
 def test_valid_visitor_trip_is_saved(db):
     make_trip(db, make_vehicle(db), make_driver(db), is_visitor=True,
               visitor_name="John", visitor_phone="0171234567")
+
+
+def test_approval_status_needs_a_skipped_step(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), approval_status="pending")
+
+
+def test_skipped_step_needs_an_approval_status(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), start_no_scan_reason="No phone")
+
+
+def test_approval_status_must_be_a_known_value(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), start_no_scan_reason="No phone", approval_status="maybe")
+
+
+def test_decided_approval_needs_the_admin(db):
+    with pytest.raises(IntegrityError):
+        make_trip(db, make_vehicle(db), make_driver(db), start_no_scan_reason="No phone", approval_status="approved")

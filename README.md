@@ -204,14 +204,38 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
 - [x] `POST /api/admin/trips/{id}/unlock` (admin only; body `reason`): resets the wrong-ID count of the blocked stage (start or end), solves the
       `wrong_ids` alert; the driver can then make a new QR. `409 NOT_LOCKED` if the trip is not blocked. The history stays in the audit log
       (`passenger_wrong_id` events).
-- [x] 15 new tests (`tests/test_admin_trips.py`), **128 in total pass**.
-- [ ] **To verify:** unzip over the repo, `pytest -q` (expect 128). In Swagger as admin: lock a trip with 5 wrong IDs, call `unlock`; or
+- [x] 15 new tests (`tests/test_admin_trips.py`), **130 in total pass**.
+- [ ] **To verify:** unzip over the repo, `pytest -q` (expect 130). In Swagger as admin: lock a trip with 5 wrong IDs, call `unlock`; or
       end a trip, then call `close` and check the car is free for a new trip.
 
 Decisions: if an end km is known (driver sent it, or the admin types `end_km` for a trip without one) the trip keeps it and the car's
 `current_km` moves forward, never backwards; with no end km the car's km is unchanged. Closing writes an `admin_closed` alert that is already
 solved (a record for the exceptions list) and solves any open `wrong_ids` alert. Unlock only resets the blocked stage. Not built: a list of
 stuck trips for the admin (comes with the admin dashboard API), and "Passenger can't scan".
+
+### 2026-10-09 ("Passenger can't scan": driver skips a confirmation, admin approves later)
+
+PDF section 8: *passenger has no phone or no internet -> driver taps "Passenger can't scan", the admin approves later, the trip is marked for review.*
+
+- [x] Migration `0003_cant_scan_approval`: `trips.start_no_scan_reason`, `end_no_scan_reason`, `approval_status` (`pending` / `approved` / `rejected`, empty
+      when nothing was skipped), `approved_by`, `approved_at`, `approval_note`, three CHECK constraints (a status needs a skipped step, a skipped step
+      needs a status, a decided status needs the admin), index on `approval_status`. Tested upgrade, `alembic check`, downgrade, upgrade.
+- [x] `POST /api/trips/{id}/cant-scan` (driver, body `reason`): at the start, trip goes to `in_progress` without a passenger, Start QR stops, journey start time set,
+      `needs_review = true`, `approval_status = pending`.
+- [x] `POST /api/trips/{id}/end-cant-scan` (driver, body `reason`): at the end, trip goes to `completed` without confirmation (`end_confirm_time` stays empty),
+      End QR stops, the car's `current_km` moves forward as usual, same flags.
+- [x] `GET /api/admin/trips/approvals` (admin or viewer): trips waiting for a decision, oldest first.
+- [x] `POST /api/admin/trips/{id}/approval` (admin only, body `decision` = `approved` / `rejected`, `note`; a rejection needs a note). The trip itself is not
+      changed (it already happened); the decision is kept for the exceptions report. `409 NO_PENDING_APPROVAL` if there is nothing to decide.
+- [x] Setting `allow_cant_scan` (1 or 0, default 1) switches the driver option off. New error codes: `CANT_SCAN_NOT_ALLOWED` 403, `REASON_REQUIRED` 422.
+- [x] 19 new tests (147 in total pass in the sandbox).
+- [ ] **To verify:** unzip over the repo, `alembic upgrade head` (applies 0003), `python -m app.seed` (adds `allow_cant_scan`), `pytest -q` (expect 147).
+      In Swagger: start a trip as a driver, call `cant-scan`, end it, call `end-cant-scan`, then as admin `GET /admin/trips/approvals` and `POST .../approval`.
+
+Decisions: the reason is required and free text (the driver may name the passenger there, nothing is verified). A trip locked by wrong IDs may still use
+"can't scan" (it is flagged for review anyway, and the admin sees the `wrong_ids` alert). `needs_review` is **not** cleared by an approval, because it can
+also come from a visitor trip; `approval_status` is the separate field for this decision. No alert type was added (that would need an enum migration): the
+admin finds these trips with the approvals list. Possible later hardening: a daily limit per driver on "can't scan", to spot misuse.
 
 ## Database (PDF section 16)
 
@@ -300,6 +324,10 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
 | POST | `/api/admin/trips/{id}/close` | admin | close any open trip with a reason (optional end km); car and driver are freed |
 | POST | `/api/admin/trips/{id}/unlock` | admin | reset wrong-ID tries of a blocked trip |
+| POST | `/api/trips/{id}/cant-scan` | driver | passenger cannot scan the Start QR: trip begins, marked for admin approval |
+| POST | `/api/trips/{id}/end-cant-scan` | driver | passenger cannot scan the End QR: trip completes, marked for admin approval |
+| GET | `/api/admin/trips/approvals` | admin / viewer | trips waiting for an approval decision |
+| POST | `/api/admin/trips/{id}/approval` | admin | approve or reject (rejection needs a note) |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -320,7 +348,7 @@ Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 day
 README.md                  this file
 docs/                      the project plan PDF
 backend/
-  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers)
+  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -343,14 +371,15 @@ backend/
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
   tests/test_admin_trips.py admin close and unlock
+  tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
 frontend/                  not started
 ```
 
 ## Next steps
 
-1. Verify the end-of-trip and admin close/unlock parts on the developer machine (unchecked items above) and commit.
-2. Backend, next pieces in this order: "Passenger can't scan" approval; alerts and background jobs (long trip, waiting too long, reminders);
+1. Verify the unchecked items above on the developer machine (can't scan) and commit.
+2. Backend, next pieces in this order: alerts and background jobs (long trip, waiting too long, reminders);
    admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).

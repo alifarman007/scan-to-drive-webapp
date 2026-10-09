@@ -62,6 +62,21 @@ class Trip(Base):
             "is_visitor OR (visitor_name IS NULL AND visitor_phone IS NULL AND visitor_reason IS NULL)",
             name="visitor_fields_only_for_visitors",
         ),
+        # PDF 8 "Passenger can't scan": the driver skips a confirmation, the admin approves later.
+        CheckConstraint(
+            "approval_status IS NULL OR (approval_status IN ('pending','approved','rejected') "
+            "AND (start_no_scan_reason IS NOT NULL OR end_no_scan_reason IS NOT NULL))",
+            name="approval_needs_a_skipped_step",
+        ),
+        CheckConstraint(
+            "approval_status IS NOT NULL OR (start_no_scan_reason IS NULL AND end_no_scan_reason IS NULL)",
+            name="skipped_step_needs_approval_status",
+        ),
+        CheckConstraint(
+            "approval_status IS NULL OR approval_status = 'pending' "
+            "OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)",
+            name="decided_approval_has_admin",
+        ),
         # PDF rules 1 and 3: one open trip per car and per driver, enforced by the DB.
         Index(
             "uq_trips_one_open_per_vehicle",
@@ -76,6 +91,7 @@ class Trip(Base):
             postgresql_where=text(_OPEN),
         ),
         Index("ix_trips_status", "status"),
+        Index("ix_trips_approval_status", "approval_status"),
         Index("ix_trips_vehicle_id", "vehicle_id"),
         Index("ix_trips_driver_id", "driver_id"),
         Index("ix_trips_passenger_id", "passenger_id"),
@@ -123,6 +139,14 @@ class Trip(Base):
     close_reason: Mapped[str | None] = mapped_column(Text)
     # "Marked for review" (admin-closed trips, passenger could not scan, no passenger).
     needs_review: Mapped[bool] = mapped_column(Boolean, server_default=text("false"))
+    # "Passenger can't scan": reason the driver gave for skipping the start / end confirmation.
+    start_no_scan_reason: Mapped[str | None] = mapped_column(Text)
+    end_no_scan_reason: Mapped[str | None] = mapped_column(Text)
+    # NULL = nothing to approve; pending -> approved / rejected by an admin.
+    approval_status: Mapped[str | None] = mapped_column(String(10))
+    approved_by: Mapped[int | None] = mapped_column(ForeignKey("admin_users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approval_note: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

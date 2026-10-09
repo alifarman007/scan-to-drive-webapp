@@ -27,4 +27,9 @@ def trip_out(trip: Trip) -> dict:
         "journey_start_time": trip.journey_start_time,
         "end_time": trip.end_time,
         "close_reason": trip.close_reason,
+        "approval_status": trip.approval_status,
+        "start_no_scan_reason": trip.start_no_scan_reason,
+        "end_no_scan_reason": trip.end_no_scan_reason,
+        "approval_note": trip.approval_note,
+        "approved_at": trip.approved_at,
     }

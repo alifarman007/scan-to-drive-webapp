@@ -21,6 +21,7 @@ SETTINGS = [
     ("km_gap_limit_km", "20", "Km gap over last end km that raises an alert (placeholder)"),
     ("waiting_too_long_minutes", "30", "Minutes waiting for a passenger before an alert (placeholder)"),
     ("high_km_limit_km", "300", "Trip distance in km above which a high-km alert is raised (placeholder)"),
+    ("allow_cant_scan", "1", "1 = driver may tap 'Passenger can't scan' and the admin approves later; 0 = off"),
     ("allow_visitors", "1", "1 = passenger page offers 'Other' (visitor) besides EPIC employee; 0 = employee ID only"),
 ]
 

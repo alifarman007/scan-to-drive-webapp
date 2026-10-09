@@ -221,6 +221,7 @@ def _own_trip_in_state(db: Session, trip_id: int, driver: Driver, status: TripSt
         raise api_error(404, "TRIP_NOT_FOUND", "Trip not found")
     if trip.status != status:
         names = {
+            TripStatus.waiting_for_passenger: ("TRIP_NOT_WAITING", "This trip is not waiting for a passenger"),
             TripStatus.in_progress: ("TRIP_NOT_IN_PROGRESS", "This trip is not in progress"),
             TripStatus.waiting_for_end_confirm: ("TRIP_NOT_WAITING_END", "This trip is not waiting for the end confirmation"),
         }
@@ -317,3 +318,63 @@ def new_end_qr(
     log_event(db, request, "end_qr_renewed", f"driver:{driver.employee_id}", trip_id=trip.id)
     db.commit()
     return {"end_qr": {"url": url, "expires_at": expires_at}}
+
+
+# ---- "Passenger can't scan" (PDF section 8): the driver skips a confirmation, the admin approves later ----
+
+class CantScanBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+def _check_cant_scan(db: Session, reason: str) -> str:
+    if not app_settings.get_int(db, "allow_cant_scan"):
+        raise api_error(403, "CANT_SCAN_NOT_ALLOWED", "This option is switched off. Please ask the admin.")
+    reason = reason.strip()
+    if not reason:
+        raise api_error(422, "REASON_REQUIRED", "Please say why the passenger cannot scan")
+    return reason
+
+
+@router.post("/{trip_id}/cant-scan")
+def start_cant_scan(
+    trip_id: int, body: CantScanBody, request: Request,
+    driver: Driver = Depends(current_driver), db: Session = Depends(get_db),
+):
+    """'Passenger can't scan' at the start: the trip begins without the passenger's confirmation.
+
+    It is marked for review and waits for an admin approval. The Start QR stops working."""
+    reason = _check_cant_scan(db, body.reason)
+    trip = _own_trip_in_state(db, trip_id, driver, TripStatus.waiting_for_passenger, lock=True)
+    trip.status = TripStatus.in_progress
+    trip.journey_start_time = datetime.now(timezone.utc)
+    trip.start_no_scan_reason = reason
+    trip.approval_status = "pending"
+    trip.needs_review = True
+    revoke_open_tokens(db, trip.id, TripStage.start)
+    log_event(db, request, "trip_started_unconfirmed", f"driver:{driver.employee_id}", trip_id=trip.id,
+              detail={"reason": reason})
+    db.commit()
+    return {"trip": trip_out(trip)}
+
+
+@router.post("/{trip_id}/end-cant-scan")
+def end_cant_scan(
+    trip_id: int, body: CantScanBody, request: Request,
+    driver: Driver = Depends(current_driver), db: Session = Depends(get_db),
+):
+    """'Passenger can't scan' at the end: the trip completes without the passenger's confirmation.
+
+    It is marked for review and waits for an admin approval. The car's km moves forward as usual."""
+    reason = _check_cant_scan(db, body.reason)
+    trip = _own_trip_in_state(db, trip_id, driver, TripStatus.waiting_for_end_confirm, lock=True)
+    trip.status = TripStatus.completed  # end_confirm_time stays empty: nobody confirmed
+    trip.end_no_scan_reason = reason
+    trip.approval_status = "pending"
+    trip.needs_review = True
+    revoke_open_tokens(db, trip.id, TripStage.end)
+    vehicle = db.scalar(select(Vehicle).where(Vehicle.id == trip.vehicle_id).with_for_update())
+    vehicle.current_km = trip.end_km
+    log_event(db, request, "trip_completed_unconfirmed", f"driver:{driver.employee_id}", trip_id=trip.id,
+              detail={"reason": reason, "end_km": trip.end_km})
+    db.commit()
+    return {"trip": trip_out(trip)}
