@@ -18,6 +18,7 @@ from app.models import (
 from app.schemas import trip_out
 from app.services import settings as app_settings
 from app.services.audit import log_event
+from app.services.jobs import driver_reminders
 from app.services.qr_access import is_locked
 from app.services.tokens import create_trip_token, revoke_open_tokens
 from app.services.trips import open_trip_for_driver, start_blocker
@@ -149,7 +150,12 @@ def active_trip(driver: Driver = Depends(current_driver), db: Session = Depends(
     end_blocked = bool(
         trip and trip.status == TripStatus.waiting_for_end_confirm and is_locked(db, trip.id, TripStage.end)
     )
-    return {"trip": trip_out(trip) if trip else None, "start_qr_blocked": blocked, "end_qr_blocked": end_blocked}
+    return {
+        "trip": trip_out(trip) if trip else None,
+        "start_qr_blocked": blocked,
+        "end_qr_blocked": end_blocked,
+        "reminders": driver_reminders(db, trip) if trip else [],  # from the background checks (PDF 11.4)
+    }
 
 
 def _own_waiting_trip(db: Session, trip_id: int, driver: Driver) -> Trip:

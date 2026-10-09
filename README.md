@@ -237,6 +237,27 @@ Decisions: the reason is required and free text (the driver may name the passeng
 also come from a visitor trip; `approval_status` is the separate field for this decision. No alert type was added (that would need an enum migration): the
 admin finds these trips with the approvals list. Possible later hardening: a daily limit per driver on "can't scan", to spot misuse.
 
+### 2026-10-09 (background alerts, driver reminders, admin alerts list)
+
+PDF 11.4 and section 17 (APScheduler worker). **No database change in this step.**
+
+- [x] `app/services/jobs.py`: `run_checks()` raises **long trip** (trip In progress longer than setting `long_trip_hours`, default 6) and **waiting too long**
+      (Waiting for passenger since the trip started, or Waiting for end confirm since the driver ended it, longer than `waiting_too_long_minutes`, default 30)
+      alerts. Each is raised once (waiting: once per stage), so running every minute does not repeat them.
+- [x] `app/worker.py`: `python -m app.worker` runs the checks every minute (APScheduler, a separate process next to the API; run only one). New package: `apscheduler`.
+- [x] Driver reminder: `GET /api/trips/active` now returns `reminders: [{type, message, since}]` while the matching alert is open and the trip is still in that state. It
+      stops when the admin solves the alert or the trip moves on. The app shows it as a banner. (No SMS or push in Phase One.)
+- [x] `GET /api/admin/alerts?status=open|solved|all&type=&limit=&offset=` (admin or viewer), newest first, with trip number and car code.
+- [x] `POST /api/admin/alerts/{id}/solve` (admin only, optional `note`). `409 ALREADY_SOLVED`, audit event `alert_solved`.
+- [x] 12 new tests (`tests/test_alerts.py`), **159 in total pass**. The worker was started and ran its first check.
+- [ ] **To verify:** `pip install apscheduler`, `pytest -q` (expect 159). Run `python -m app.worker` in a second window. In Swagger: to see a long-trip alert quickly, set
+      `long_trip_hours` to 0 or `waiting_too_long_minutes` to 0 in the `settings` table (pgAdmin: `UPDATE settings SET value='0' WHERE key='waiting_too_long_minutes';`),
+      start a trip, wait a minute, then `GET /api/trips/active` (driver, see `reminders`) and `GET /api/admin/alerts` (admin). **Set the values back afterwards** (30 and 6).
+
+Alert types already raised elsewhere: `km_gap` (start trip), `high_km` (end trip), `wrong_ids` (passenger side), `admin_closed` (admin close).
+Decisions: the admin "reminder" is the alert itself; the driver reminder is an in-app banner. A solved alert is never raised again for the same trip/stage. Not built:
+the PDF's reminder for maintenance, and the nightly backup job (belongs to deployment).
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -280,12 +301,13 @@ completed trips locked except admin corrections with a reason; never delete cars
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart pytest
+pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 alembic upgrade head          # create/update tables
 python -m app.seed            # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
 pytest -q                     # database rule tests and sign-in tests
 uvicorn app.main:app --reload # API at http://localhost:8000, docs at /api/docs
+python -m app.worker          # second PowerShell window: background alert checks every minute (run only one)
 pip freeze > requirements.txt
 ```
 
@@ -312,7 +334,7 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | GET | `/api/auth/me` | signed in | who am I |
 | GET | `/api/cars/{car_code}?v=` | driver | car page: details, last end km, can start or why not |
 | POST | `/api/trips` | driver | start a trip (multipart form + dashboard photo) |
-| GET | `/api/trips/active` | driver | the driver's open trip or null, plus `start_qr_blocked` |
+| GET | `/api/trips/active` | driver | the driver's open trip or null, plus `start_qr_blocked`, `end_qr_blocked`, `reminders` |
 | POST | `/api/trips/{id}/start-qr` | driver | new Start QR (old one stops working; `423` if the trip is locked by wrong IDs) |
 | POST | `/api/trips/{id}/cancel` | driver / admin | cancel before the passenger confirms (reason required) |
 | POST | `/api/trips/{id}/end` | driver | end the trip (multipart form + end photo); returns the End QR, or completes at once with no passenger |
@@ -328,6 +350,8 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/trips/{id}/end-cant-scan` | driver | passenger cannot scan the End QR: trip completes, marked for admin approval |
 | GET | `/api/admin/trips/approvals` | admin / viewer | trips waiting for an approval decision |
 | POST | `/api/admin/trips/{id}/approval` | admin | approve or reject (rejection needs a note) |
+| GET | `/api/admin/alerts` | admin / viewer | alerts list (filter by status and type) |
+| POST | `/api/admin/alerts/{id}/solve` | admin | mark an alert as solved, with a note |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -358,9 +382,11 @@ backend/
   app/routers/auth.py      driver and admin sign-in
   app/routers/cars.py      car page
   app/routers/trips.py     start trip, active trip, new Start QR, cancel, end trip, new End QR
-  app/routers/admin_trips.py admin close and unlock of trips
+  app/routers/admin_trips.py admin close, unlock, approvals
+  app/routers/admin_alerts.py alerts list and solve
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
-  app/services/            audit log, settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
+  app/worker.py            background worker (alert checks every minute)
+  app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
                            phone normalizing (phones.py)
   app/storage.py           photo storage (local folder now, Azure Blob later)
   app/errors.py            error format helper; app/schemas.py response shapes
@@ -371,6 +397,7 @@ backend/
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
   tests/test_admin_trips.py admin close and unlock
+  tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
 frontend/                  not started
@@ -378,8 +405,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above on the developer machine (can't scan) and commit.
-2. Backend, next pieces in this order: alerts and background jobs (long trip, waiting too long, reminders);
+1. Verify the unchecked items above (alerts and reminders) on the developer machine and commit.
+2. Backend, next pieces in this order: admin dashboard and trip history API (with photos and timeline), audit log search;
    admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
