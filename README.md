@@ -120,7 +120,7 @@ and multi-passenger trips are deliberately postponed, but should not be blocked 
       start a trip as a driver, copy the token part of `start_qr.url` (after `/p/`), call `GET /api/p/{token}`, `POST .../lookup`
       with `EMP-2210`, then `POST .../confirm-start`. Try 5 wrong IDs on another trip to see the block.
 
-#### Decisions made in this step (from the developer's answers)
+#### Decisions in this step
 
 - **Passenger page has two choices:** "Employee of EPIC" (employee ID only) or "Others" (name, phone number, reason of travel
   optional). **The passenger chooses**, not the driver, because the driver may not know who is who. The front end must build
@@ -295,7 +295,7 @@ Admins and viewers may look; only admins may change cars or print stickers (PDF 
       The car code and the sticker version cannot be set here. A car with an open trip cannot be set to maintenance or inactive (`409 CAR_HAS_OPEN_TRIP`).
 - [x] `POST /api/admin/cars/{id}/new-sticker`: lost sticker: sticker version +1, the **old sticker stops working at once** (`410 STICKER_OUTDATED` on the car page).
 - [x] `GET /api/admin/cars/{id}/qr.pdf?layout=sticker|a4`: printable sticker, 6 x 6 cm with the car code and "Scan to start trip" under the QR (`sticker`, one small page for a label printer),
-      or an A4 page with the sticker at the top left and a dotted cut line (`a4`, for an office printer). The QR holds only `{PUBLIC_BASE_URL}/c/{car_code}?v={version}`.
+      or an A4 page with the sticker at the top left and a dotted cut line (`a4`, for an office printer). The response is a file download (`Content-Disposition: attachment`); add `inline=true` to show it in the browser instead. The QR holds only `{PUBLIC_BASE_URL}/c/{car_code}?v={version}`.
 - [x] Audit events: `car_created`, `car_updated`, `car_sticker_renewed`, `car_sticker_printed`.
 - [x] 25 new tests (`tests/test_admin_cars.py`), **207 in total pass**. The sticker PDF was rendered and looked at.
 - [ ] **To verify:** `pip install qrcode reportlab pillow`, `pytest -q` (expect 207). In Swagger as admin: `POST /api/admin/cars`, `GET /api/admin/cars`, open `/api/admin/cars/{id}/qr.pdf`
@@ -304,6 +304,29 @@ Admins and viewers may look; only admins may change cars or print stickers (PDF 
 
 Decisions: no delete (a car with history is set to inactive instead). The car code is permanent because it is printed on the sticker; a wrong code means adding a new car. The km correction exists
 for a replaced odometer; normal km changes only come from trips. Not built: a "Fuel and maintenance records" feature (PDF 'later' list).
+
+### 2026-10-09 (admin: drivers, passengers, Excel import)
+
+PDF 11.2 (Drivers and Passengers pages). No database change. New package: `openpyxl`. Admin and viewer can look, only admin can change.
+
+- [x] Drivers: `GET /api/admin/drivers` (filters `q`, `status`), `GET /api/admin/drivers/{id}`, `POST /api/admin/drivers`, `PATCH /api/admin/drivers/{id}`,
+      `POST /api/admin/drivers/{id}/reset-pin`. A driver is added without a PIN and chooses a 4-digit PIN at the first sign-in. Reset PIN removes the PIN so the driver is
+      asked for a new one. Name, phone, licence number and status can be edited; the employee ID cannot. Totals shown: trips, km, cancelled trips, last trip, open trip, has PIN.
+- [x] Passengers: `GET /api/admin/passengers` (filters `q`, `department`, `status`, `limit`, `offset`), `GET /api/admin/passengers/departments`, `GET /api/admin/passengers/{id}`,
+      `POST /api/admin/passengers`, `PATCH /api/admin/passengers/{id}`. Name, department, phone and status can be edited; the employee ID cannot.
+- [x] Excel import: `POST /api/admin/passengers/import` (file upload, `.xlsx`, max 5 MB, 5000 rows). The first row holds the headings: Employee ID and Name are required, Department and Phone are
+      optional, any order (also accepted: Emp ID, Dept, Mobile, Full Name, and similar). A new employee ID is added; an existing one gets the new name, department and phone (blank cells keep the old
+      department and phone). Nobody is deactivated for missing from the file, and an inactive person stays inactive. Bad rows are skipped and listed with their row number, the rest are saved.
+      `?dry_run=true` shows the result without saving. A ready sheet is in `docs/passenger-import-template.xlsx`.
+- [x] Deactivating a driver or passenger keeps all history. A deactivated driver is signed out at once (the saved sign-in stops working) and can be activated again. An inactive passenger gets
+      "ID not found" on the passenger page. A driver with an open trip cannot be deactivated (`409 DRIVER_HAS_OPEN_TRIP`).
+- [x] Audit events: `driver_created`, `driver_updated`, `driver_pin_reset`, `passenger_created`, `passenger_updated`, `passengers_imported`.
+- [x] 20 new tests (`tests/test_admin_people.py`), 227 in total pass in the sandbox.
+- [ ] To verify: `pip install openpyxl`, `pytest -q` (expect 227). In Swagger as admin: add a driver, then sign in as that driver and set a PIN; `reset-pin` and sign in again;
+      import `docs/passenger-import-template.xlsx` with `dry_run=true`, then without; search the new people with `q`.
+
+Notes: nothing is ever deleted, only set inactive. An employee ID is permanent (history and QR flows use it). Drivers and passengers are separate lists, so a driver who also rides as a
+passenger needs an entry in both. Admin users and Settings are the remaining admin pages.
 
 ## Database (PDF section 16)
 
@@ -348,7 +371,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler qrcode reportlab pillow pytest
+pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler qrcode reportlab pillow openpyxl pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 alembic upgrade head          # create/update tables
 python -m app.seed            # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
@@ -410,6 +433,14 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | PATCH | `/api/admin/cars/{id}` | admin | edit registration, model, status; correct km with a reason |
 | POST | `/api/admin/cars/{id}/new-sticker` | admin | new sticker version; the old sticker stops working |
 | GET | `/api/admin/cars/{id}/qr.pdf` | admin | printable QR sticker (`layout=sticker` or `a4`) |
+| GET | `/api/admin/drivers` | admin / viewer | driver list with totals; also `/{id}` |
+| POST | `/api/admin/drivers` | admin | add a driver (no PIN) |
+| PATCH | `/api/admin/drivers/{id}` | admin | edit driver, set active / inactive |
+| POST | `/api/admin/drivers/{id}/reset-pin` | admin | remove the PIN; driver sets a new one at next sign-in |
+| GET | `/api/admin/passengers` | admin / viewer | employee list with filters and paging; also `/{id}` and `/departments` |
+| POST | `/api/admin/passengers` | admin | add an employee |
+| PATCH | `/api/admin/passengers/{id}` | admin | edit employee, set active / inactive |
+| POST | `/api/admin/passengers/import` | admin | import or update employees from an Excel file (`?dry_run=true` to preview) |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -443,9 +474,11 @@ backend/
   app/routers/admin_trips.py admin close, unlock, approvals
   app/routers/admin_alerts.py alerts list and solve
   app/routers/admin_cars.py cars list, add / edit, new sticker version, sticker PDF
+  app/routers/admin_people.py drivers and passengers: list, add, edit, reset PIN, Excel import
   app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/worker.py            background worker (alert checks every minute)
+  app/services/people_import.py reads the passenger Excel sheet
   app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
   app/services/timeutil.py Bangladesh days for dashboards and filters
   app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
@@ -460,6 +493,7 @@ backend/
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
   tests/test_admin_trips.py admin close and unlock
   tests/test_admin_cars.py cars and stickers
+  tests/test_admin_people.py drivers, passengers, import
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -469,8 +503,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above (admin cars and stickers) on the developer machine and commit.
-2. Backend, next pieces in this order: admin CRUD for drivers (with PIN reset), passengers (with Excel import), users and settings, then reports and Excel/PDF export. Endpoint list: PDF section 15.
+1. Verify the unchecked items above (admin drivers, passengers and import) on the developer machine and commit.
+2. Backend, next pieces in this order: admin users and settings pages, then reports and Excel/PDF export. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
