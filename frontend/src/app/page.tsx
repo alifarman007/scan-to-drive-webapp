@@ -13,7 +13,7 @@ export default async function HomePage() {
   const t = await getTranslations();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="rounded-b-[2rem] bg-navy px-gutter pt-5 pb-20 text-white">
+      <header className="rounded-b-4xl bg-navy px-gutter pt-5 pb-20 text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <Wordmark name={t("app.name")} company={t("app.company")} />
           <LanguageSwitch tone="onDark" />
