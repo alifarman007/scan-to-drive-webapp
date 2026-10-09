@@ -37,3 +37,19 @@ SPECS = {
     "allow_cant_scan": (0, 1, "1 = driver may tap 'Passenger can't scan' (admin approves later); 0 = off"),
     "allow_visitors": (0, 1, "1 = passenger page offers 'Other' (visitor); 0 = employee ID only"),
 }
+
+
+# Trip purposes the driver can pick from (the field can still be typed). Stored in the settings table under
+# the key "purposes", one per line. Placeholder list until the company gives its own.
+DEFAULT_PURPOSES = [
+    "Office meeting", "Client visit", "Site visit", "Airport pick-up / drop", "Bank or government office", "Other",
+]
+
+
+def get_purposes(db: Session) -> list[str]:
+    row = db.get(Setting, "purposes")
+    if row is not None:
+        items = [x.strip() for x in row.value.split("\n") if x.strip()]
+        if items:
+            return items
+    return list(DEFAULT_PURPOSES)

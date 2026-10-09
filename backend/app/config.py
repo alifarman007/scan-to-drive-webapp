@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     storage_dir: str = "uploads"
     max_photo_mb: int = 5
 
+    # Optional TrueType fonts for PDF reports. The built-in PDF font has no Bangla letters; point these to a
+    # font that has them (for example Noto Sans Bengali) if names or places in Bangla must appear in PDFs.
+    pdf_font_path: str | None = None
+    pdf_font_bold_path: str | None = None
+
     # Origins allowed to call the API from a browser (the Next.js dev server).
     cors_origins: list[str] = ["http://localhost:3000"]
 

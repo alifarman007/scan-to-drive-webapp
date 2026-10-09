@@ -274,15 +274,8 @@ def admin_photo(
 
 # ---- audit log ---------------------------------------------------------------------------------
 
-@router.get("/audit")
-def audit_log(
-    q: str | None = Query(None, max_length=100, description="search event, actor, IP, device and details"),
-    event: str | None = Query(None, max_length=80), actor: str | None = Query(None, max_length=120),
-    trip_id: int | None = None, date_from: date | None = None, date_to: date | None = None,
-    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
-    _: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
-):
-    """Every action in the system, newest first (read only, admin only). Dates are Bangladesh dates."""
+def audit_filters(q, event, actor, trip_id, date_from, date_to) -> list:
+    """WHERE parts shared by the audit log list and its Excel/PDF export."""
     if date_from and date_to and date_from > date_to:
         raise api_error(422, "BAD_DATE_RANGE", "date_from must not be after date_to")
     start, end = range_bounds(date_from, date_to)
@@ -303,6 +296,19 @@ def audit_log(
             TripEvent.event.icontains(term, autoescape=True), TripEvent.actor.icontains(term, autoescape=True),
             TripEvent.ip.icontains(term, autoescape=True), TripEvent.device.icontains(term, autoescape=True),
             cast(TripEvent.detail, Text).icontains(term, autoescape=True)))
+    return where
+
+
+@router.get("/audit")
+def audit_log(
+    q: str | None = Query(None, max_length=100, description="search event, actor, IP, device and details"),
+    event: str | None = Query(None, max_length=80), actor: str | None = Query(None, max_length=120),
+    trip_id: int | None = None, date_from: date | None = None, date_to: date | None = None,
+    limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
+    _: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
+):
+    """Every action in the system, newest first (read only, admin only). Dates are Bangladesh dates."""
+    where = audit_filters(q, event, actor, trip_id, date_from, date_to)
     total = db.scalar(select(func.count()).select_from(TripEvent).where(*where))
     rows = db.execute(
         select(TripEvent, Trip.trip_no).outerjoin(Trip, Trip.id == TripEvent.trip_id).where(*where)

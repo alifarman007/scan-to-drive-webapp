@@ -346,6 +346,40 @@ PDF 11.2 (Users and Settings pages). No database change, no new package. Users p
 
 Notes: a password reset does not clear a lockout from too many wrong tries; the lock ends by itself after 15 minutes. Reports with Excel/PDF export are the last backend piece.
 
+### 2026-10-09 (reports, Excel/PDF export, audit export, purposes list)
+
+PDF 11.3 (Reports), section 15 (`/admin/reports/{name}`) and the "purposes list" in 11.2 Settings. One new migration (`0004`: `settings.value` becomes text, so the purposes list fits). No new package
+(openpyxl and ReportLab were already installed). Admin and viewer can use the reports; the audit export is admin only.
+
+- [x] `GET /api/admin/reports` lists the seven reports. `GET /api/admin/reports/{name}` returns one as JSON (`summary` plus one or more `sections` with `columns` and `rows`), or as a file with
+      `?format=xlsx` or `?format=pdf`. Names: `car_usage`, `drivers`, `passenger_department`, `trip_log`, `exceptions`, `km_continuity`, `monthly_summary`.
+- [x] Filters on every report: `date_from`, `date_to` (Bangladesh dates, on the trip's start time), `range` (`today`, `week`, `month`), `car_id`, `driver_id`, `department`. With no date the report covers the
+      current month. Times in the rows are already written in Bangladesh time.
+- [x] Car usage: trips, total km, hours used, days used, idle days, km per trip. Idle days = days of the period (up to today) with no trip starting. A trip that runs past midnight counts for its start day only.
+- [x] Driver report: trips, km, average trip minutes, cancelled trips, alerts. Passenger and department: two tables (by department with share of km, by passenger). Visitors are grouped under "Visitor" and trips
+      without a passenger under "(no passenger)". Km only count for trips that are completed or closed by admin; cancelled trips are never counted as trips.
+- [x] Trip log: every trip (also cancelled) with all fields. The "photos" column is a link to the admin trip page, because the signed photo links stop working after 10 minutes and would be dead in a saved file.
+- [x] Exceptions: cancelled, closed by admin, no passenger, needs review (passenger could not scan), and the alerts made in the period (km gap, long trip, high km, wrong IDs, waiting too long).
+      "Admin closed" alerts are not listed a second time.
+- [x] Km continuity: each trip's start km against the end km of the previous trip of the same car. Gap above 0 = "Unrecorded use", below 0 = "Odometer went back". The last trip before the period is used for the first
+      comparison. If a car's odometer was replaced and corrected in the Cars page, one gap will show for that.
+- [x] Monthly summary: trips, completed, closed by admin, cancelled, total km, average km, trips without passenger, visitor trips, open alerts now, trips waiting for approval now, trips running now,
+      busiest 5 cars, top 5 departments.
+- [x] Excel: one sheet per table plus a Summary sheet, header row, filters, frozen header. Everything typed as text is stored as text, so a name that starts with `=` can never turn into a formula.
+      PDF: landscape A4, header repeats on every page, page number and date at the bottom. The very wide trip log shows only the main columns in the PDF; the Excel file has all of them.
+- [x] An export of more than 20,000 rows is refused with `TOO_MANY_ROWS` (choose fewer days). The JSON report has no such limit.
+- [x] Audit log export: `GET /api/admin/audit/export?format=xlsx|pdf` with the same filters as the audit log search (`q`, `event`, `actor`, `trip_id`, `date_from`, `date_to`); current month if no date.
+- [x] Purposes: `GET /api/purposes` (any signed-in driver or admin) gives the list for the start-trip form, `PUT /api/admin/settings/purposes` (admin) replaces it (1 to 30 items, up to 60 characters; duplicates removed;
+      every change logged as `purposes_changed`). The driver can still type any purpose. The start list is a placeholder (Office meeting, Client visit, Site visit, Airport pick-up / drop,
+      Bank or government office, Other) until the company gives its own. `GET /api/admin/settings` now also returns `purposes`.
+- [x] The dashboard already had both charts from the plan (km per car this month, trips per day), so nothing was added there.
+- [x] 22 new tests (`tests/test_reports.py`), 260 in total pass in the sandbox. Checked the PDF by eye as well.
+- [ ] To verify: `alembic upgrade head`, `pytest -q` (expect 260, or 259 passed and 1 skipped without `pdftotext`). In Swagger as admin: `GET /api/admin/reports/car_usage` (JSON), then the same with
+      `format=xlsx` and `format=pdf` and open the downloaded files; try `trip_log` with `car_id`; `GET /api/admin/audit/export`; `PUT /api/admin/settings/purposes`, then `GET /api/purposes` as a driver.
+
+Known gap: the built-in PDF font has no Bangla letters, so Bangla names or places would show as empty boxes in PDF files (Excel is fine). To fix it, put a Bangla font file (for example Noto Sans Bengali)
+on the server and set `PDF_FONT_PATH` (and optionally `PDF_FONT_BOLD_PATH`) in `.env`. Not tested with a real Bangla font yet. The backend API list in the PDF is now complete.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -403,7 +437,7 @@ pip freeze > requirements.txt
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`), `ENVIRONMENT` (`development` or `production`;
 production refuses to start with a weak key). Optional: `DRIVER_TOKEN_DAYS` (30), `ADMIN_TOKEN_MINUTES` (480),
 `LOGIN_MAX_FAILURES` (5), `LOGIN_LOCKOUT_MINUTES` (15), `CORS_ORIGINS`, `PUBLIC_BASE_URL` (QR links, default
-`http://localhost:3000`), `STORAGE_DIR` (photos, default `uploads`), `MAX_PHOTO_MB` (5).
+`http://localhost:3000`), `STORAGE_DIR` (photos, default `uploads`), `MAX_PHOTO_MB` (5), `PDF_FONT_PATH` / `PDF_FONT_BOLD_PATH` (a font file with Bangla letters for PDF reports).
 
 Change an admin password: `python -m app.set_password admin` (hidden prompt, 8-72 characters).
 Create a user: `python -m app.set_password mary --create --role viewer`.
@@ -466,6 +500,11 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/admin/users/me/password` | admin / viewer | change my own password |
 | GET | `/api/admin/settings` | admin / viewer | all settings with value, default and allowed range |
 | PATCH | `/api/admin/settings` | admin | change one or more settings (logged) |
+| GET | `/api/admin/reports` | admin / viewer | the seven ready reports |
+| GET | `/api/admin/reports/{name}` | admin / viewer | one report; filters `date_from`, `date_to`, `range`, `car_id`, `driver_id`, `department`; `format=json|xlsx|pdf` |
+| GET | `/api/admin/audit/export` | admin | audit log as Excel or PDF (`format=xlsx|pdf`, same filters as `/api/admin/audit`) |
+| GET | `/api/purposes` | driver / admin | trip purposes to pick from |
+| PUT | `/api/admin/settings/purposes` | admin | replace the purposes list (logged) |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -503,7 +542,9 @@ backend/
   app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/worker.py            background worker (alert checks every minute)
+  app/routers/admin_reports.py reports and audit export
   app/routers/admin_users.py admin/viewer accounts; app/routers/admin_settings.py settings page
+  app/services/reports.py  the seven reports; app/services/report_export.py Excel and PDF files
   app/services/people_import.py reads the passenger Excel sheet
   app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
   app/services/timeutil.py Bangladesh days for dashboards and filters
@@ -521,6 +562,7 @@ backend/
   tests/test_admin_cars.py cars and stickers
   tests/test_admin_people.py drivers, passengers, import
   tests/test_admin_users_settings.py users and settings pages
+  tests/test_reports.py    reports, Excel/PDF, audit export, purposes
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -530,8 +572,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above (admin users and settings) on the developer machine and commit.
-2. Backend, last piece: reports and Excel/PDF export (exceptions, km per car and per driver, trip log). Endpoint list: PDF section 15.
+1. Verify the unchecked items above (admin users and settings, reports) on the developer machine and commit.
+2. Backend API from PDF section 15 is complete. Still open on the backend side: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
