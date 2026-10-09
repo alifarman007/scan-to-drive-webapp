@@ -13,9 +13,9 @@ export default async function HomePage() {
   const t = await getTranslations();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="rounded-b-4xl bg-navy px-gutter pt-5 pb-20 text-white">
+      <header className="rounded-b-[2rem] bg-navy px-gutter pt-5 pb-20 text-white">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <Wordmark name={t("app.name")} company={t("app.company")} />
+          <Wordmark name={t("app.name")} />
           <LanguageSwitch tone="onDark" />
         </div>
         <div className="mx-auto mt-10 grid max-w-5xl items-end gap-8 md:grid-cols-[minmax(0,1fr)_auto]">

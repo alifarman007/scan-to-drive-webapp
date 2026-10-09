@@ -143,6 +143,20 @@
   --shadow-press: 0 10px 24px rgb(40 77 174 / 0.35);
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-scan: scan-line 2.6s ease-in-out infinite;
+}
+
+@keyframes scan-line {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(var(--scan-travel, 5rem));
+    opacity: 1;
+  }
 }
 
 @layer base {

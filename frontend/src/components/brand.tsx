@@ -1,50 +1,43 @@
+import Image from "next/image";
+
 import { cn } from "@/lib/utils";
 
 /**
- * App mark: a rounded square with a steering-wheel-and-QR glyph, plus the wordmark.
- * The Epic Group logo file goes next to it once we have it (public/epic-logo.svg).
+ * Epic Group logo + "Scan-to-Drive". The cream logo is for navy backgrounds, the navy one for light ones.
+ * Files: public/brand/epic-logo-light.png and epic-logo-navy.png (a sharper SVG can replace them later).
  */
-export function BrandMark({ className }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn("inline-flex size-9 items-center justify-center rounded-xl bg-epic text-white shadow-sm", className)}
-    >
-      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <circle cx="12" cy="12" r="8.5" />
-        <circle cx="12" cy="12" r="2.2" />
-        <path d="M4 11.5c2.5-1 5.2-1.4 8-1.4s5.5.4 8 1.4M12 14.2V20.5" />
-      </svg>
-    </span>
-  );
-}
-
 export function Wordmark({
   name,
-  company,
   tone = "onDark",
+  size = "md",
   className,
 }: {
   name: string;
-  company: string;
   tone?: "onDark" | "onLight";
+  size?: "md" | "lg";
   className?: string;
 }) {
+  const h = size === "lg" ? 40 : 30;
   return (
-    <span className={cn("inline-flex items-center gap-2.5", className)}>
-      <BrandMark />
-      <span className="flex flex-col leading-tight">
-        <span className={cn("font-display text-base font-semibold", tone === "onDark" ? "text-white" : "text-title")}>
-          {name}
-        </span>
-        <span
-          className={cn(
-            "text-[0.68rem] font-semibold tracking-[0.16em] uppercase",
-            tone === "onDark" ? "text-sky" : "text-muted",
-          )}
-        >
-          {company}
-        </span>
+    <span className={cn("inline-flex items-center gap-3", className)}>
+      <Image
+        src={tone === "onDark" ? "/brand/epic-logo-light.png" : "/brand/epic-logo-navy.png"}
+        alt="Epic Group"
+        width={Math.round((h * 286) / 124)}
+        height={h}
+        priority
+        className="h-auto select-none"
+        style={{ height: h, width: "auto" }}
+      />
+      <span aria-hidden="true" className={cn("h-7 w-px", tone === "onDark" ? "bg-white/25" : "bg-border-strong")} />
+      <span
+        className={cn(
+          "font-display font-semibold leading-tight",
+          size === "lg" ? "text-lg" : "text-[0.95rem]",
+          tone === "onDark" ? "text-white" : "text-title",
+        )}
+      >
+        {name}
       </span>
     </span>
   );

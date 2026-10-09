@@ -418,6 +418,49 @@ Design agreed from the mockups (Design canvas "Scan-to-Drive UI mockups"). Front
 Notes: admin pages are not protected yet; sign-in comes with the admin login (step 5). The Epic logo is not in the app yet (a placeholder mark is
 used); put the logo file in `frontend/public/` when we have it. Bangla texts need a read-through by a native speaker.
 
+### 2026-10-09 (frontend step 2: driver sign-in, sessions in cookies, testing on phones)
+
+Backend change (no database change, no new package):
+- [x] Sign-in is kept in httpOnly cookies (`s2d_driver` 30 days, `s2d_admin` 8 hours, SameSite=Lax, `Secure` in production). Page scripts cannot
+      read them, so a bad script cannot steal a session. The token is still in the login reply, so Swagger's Authorize button keeps working.
+- [x] Requests that change something and use the cookie must carry the header `X-S2D: 1` (the web app always sends it), otherwise
+      `403 CSRF_CHECK_FAILED`. Other websites cannot add that header, which stops them from making requests in someone's name.
+      Requests with a Bearer token (Swagger, scripts, tests) do not need it.
+- [x] Driver and admin cookies are separate, so one laptop can be signed in as a driver and as an admin at the same time.
+- [x] New: `GET /api/auth/driver/me`, `GET /api/auth/admin/me`, `POST /api/auth/logout?who=driver|admin|all`.
+- [x] The passenger pages also notice the driver cookie (a driver cannot confirm their own trip from their own phone).
+- [x] Employee ID at sign-in ignores letter case and spaces (`emp-1021` works). The lockout counts the stored ID, so changing the letter case
+      does not give extra tries.
+- [x] Easy PINs are refused when choosing one: all the same digit (1111) or a straight run (1234, 6789, 9876 ...): `422 WEAK_PIN`.
+- [x] Setting `COOKIE_SECURE` (empty = on in production, off in development so plain http works on test phones).
+- [x] 12 new tests (`tests/test_cookie_sessions.py`), two older tests changed to use PINs that are not easy. 272 in total pass.
+
+Frontend:
+- [x] Epic Group logo in all headers (cream version on navy, navy version on light): `frontend/public/brand/`. A sharper SVG can replace the PNGs later.
+- [x] `/driver/login`: employee ID and 4 PIN boxes (one real input behind them, so the phone shows the number pad and paste works). Signs in by
+      itself when the 4th digit is typed. Wrong PIN: the boxes shake, the PIN is cleared and a message shows. First sign-in (or after the admin
+      reset the PIN): "Choose your PIN", then "Type the PIN again", then a tick and straight in. The last employee ID is remembered on the phone.
+- [x] `/driver`: greeting (morning / afternoon / evening, Bangladesh time), name and ID; the open trip if there is one; otherwise "Scan the QR
+      sticker in the car" with a moving scan line, and a box to type the car code if a sticker is missing. Sign out at the bottom.
+- [x] `/c/{car}` (where the car sticker leads): not signed in, so sign in first and then come straight back to the same car. The car page itself is step 3.
+      Only addresses on this site are accepted as the "come back to" page.
+- [x] All `/api/...` calls go through `src/app/api/[...path]/route.ts`, a small proxy to FastAPI. It replaces the rewrite in `next.config.ts`
+      because the rewrite did not pass on the phone's IP address (the audit log showed 127.0.0.1 for everyone) and fixed the backend address at
+      build time. Now the audit log has the phone's address, and `BACKEND_URL` is read when the server starts.
+- [x] Testing on phones: `npm run dev:lan` prints the laptop's Wi-Fi address and a QR code to scan with the phone. Phones only need the
+      frontend address; the backend stays on 127.0.0.1. Next.js 16 blocks the dev server for other addresses unless allowed, so home and office
+      ranges (192.168.x.x, 10.x.x.x, 172.x.x.x) and the found address are allowed in development. The floating Next.js dev button is turned off
+      (it covered the sign-out button on phones).
+- [x] `BACKEND_URL` defaults to `http://127.0.0.1:8000` instead of `localhost`: on Windows, Node looks up `localhost` as IPv6 (::1) first, where
+      uvicorn is not listening.
+- [x] Checked in the sandbox with the real backend and database: new driver chooses a PIN (easy PIN and mismatch caught), comes back to the
+      car page, cookie is httpOnly and not readable by scripts, sign out, ID remembered, wrong PIN, sign in again, open-redirect blocked,
+      Bangla, dark, report download through the proxy, change without `X-S2D` refused, phone IP in the audit log. Production build, lint and types pass.
+- [ ] To verify on the laptop and phones: see "Testing on phones" below.
+
+Notes: GPS (start place) needs HTTPS on phones; plain http on the Wi-Fi address is fine for this step and will be handled in step 3. The admin
+pages are still open without sign-in until step 5.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -489,12 +532,29 @@ Needs Node.js 22 LTS (Next.js 16 needs 20.9 or newer). Run the backend first, in
 
 ```powershell
 npm ci                        # first time, and after package.json changes
-copy .env.example .env.local  # first time only; BACKEND_URL=http://localhost:8000
-npm run dev                   # http://localhost:3000
+copy .env.example .env.local  # first time only; BACKEND_URL=http://127.0.0.1:8000
+npm run dev                   # http://localhost:3000 (this laptop only)
+npm run dev:lan               # same, plus the address and a QR code for phones on the same Wi-Fi
 npm run lint                  # code checks
 npm run typecheck             # TypeScript checks
 npm run build                 # production build (what the server will run)
+npm run start:lan             # run the production build for phones (faster than dev on phones)
 ```
+
+### Testing on phones (one laptop, two or three phones)
+
+1. Laptop and phones on the **same Wi-Fi**. In Windows, that Wi-Fi should be a **Private** network
+   (Settings > Network & internet > Wi-Fi > the network > Private).
+2. Window 1, backend (stays on 127.0.0.1, Swagger at http://127.0.0.1:8000/api/docs):
+   `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
+3. Window 2, frontend: `npm run dev:lan`. It prints something like `On the phones: http://192.168.1.23:3000` and a QR code.
+4. The first time, Windows asks whether Node.js may use the network: tick **Private networks** and allow.
+   If you missed it, in PowerShell **as administrator**:
+   `New-NetFirewallRule -DisplayName "Scan-to-Drive 3000" -Direction Inbound -Protocol TCP -LocalPort 3000 -Action Allow -Profile Private`
+5. On each phone, scan the QR code in the terminal (or type the address). Each phone can sign in as a different driver.
+6. For car stickers and passenger QR codes to open on the phones (step 3 onwards), set `PUBLIC_BASE_URL=http://192.168.1.23:3000`
+   (your address) in `backend/.env` and restart the backend.
+7. The laptop's address can change when it reconnects to the Wi-Fi; `npm run dev:lan` always shows the current one.
 
 ## API so far
 
@@ -504,6 +564,9 @@ npm run build                 # production build (what the server will run)
 | POST | `/api/auth/driver/login` | driver | employee ID + PIN; `409 PIN_NOT_SET` means ask for a new PIN |
 | POST | `/api/auth/driver/set-pin` | driver | first sign-in only; returns a token |
 | POST | `/api/auth/admin/login` | admin / viewer | username + password |
+| GET | `/api/auth/driver/me` | driver | who is signed in (driver app) |
+| GET | `/api/auth/admin/me` | admin / viewer | who is signed in (admin app) |
+| POST | `/api/auth/logout` | anyone | `?who=driver`, `admin` or `all`: removes the session cookie(s) |
 | GET | `/api/auth/me` | signed in | who am I |
 | GET | `/api/cars/{car_code}?v=` | driver | car page: details, last end km, can start or why not |
 | POST | `/api/trips` | driver | start a trip (multipart form + dashboard photo) |
@@ -569,6 +632,9 @@ Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 day
   until forwarded headers are configured (the IP is stored in the audit log).
 - Unknown employee IDs get the same 401 as a wrong PIN, but a known driver without a PIN gets 409 (reveals that the ID exists).
 - Tests may show a Starlette deprecation warning about `httpx`; it is harmless.
+- Web sessions are httpOnly cookies; changes made with a cookie need the `X-S2D: 1` header (CSRF guard). In production, Nginx must set
+  `X-Forwarded-For` to the real client address (`proxy_set_header X-Forwarded-For $remote_addr;`) so it cannot be faked, and uvicorn must be
+  told to trust the frontend container (`FORWARDED_ALLOW_IPS`). To do with the Docker step.
 
 ## Repo layout
 
@@ -614,6 +680,7 @@ backend/
   tests/test_admin_people.py drivers, passengers, import
   tests/test_admin_users_settings.py users and settings pages
   tests/test_reports.py    reports, Excel/PDF, audit export, purposes
+  tests/test_cookie_sessions.py cookies, CSRF header, sign-out, weak PINs, ID letter case
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -625,13 +692,19 @@ frontend/                  Next.js app
   src/components/ui/       shared pieces: Button, Input, Card, StatusChip, Odometer, CountdownRing, Reveal, ThemeToggle, LanguageSwitch
   src/components/admin/    admin frame (sidebar, top bar) and the menu list
   src/i18n/                language from the cookie (next-intl)
+  src/app/api/[...path]/   passes /api/... on to FastAPI (with the caller's IP)
+  src/app/driver/, src/app/c/  driver sign-in, driver home, car sticker landing
+  src/components/driver/   driver screens (sign-in, frame, sign out, car code form, scan picture)
+  src/lib/api.ts           browser calls to the API (errors, X-S2D header); server-api.ts for server-side checks
+  public/brand/            Epic Group logo (cream and navy)
+  scripts/dev-lan.mjs      starts the dev server for phones and prints the address + QR code
 ```
 
 ## Next steps
 
-1. Verify the unchecked items above (frontend step 1) on the developer machine and commit.
-2. Frontend step 2: driver sign-in (employee ID + PIN, choose a PIN on first sign-in) and how the sign-in is kept on the phone.
-3. Then steps 3-9 as listed in the frontend step 1 entry.
+1. Verify the unchecked items above (frontend step 2) on the laptop and phones, and commit.
+2. Frontend step 3: driver trip flow (car page, start form with photo and GPS, Start QR, trip in progress, end form, End QR), with HTTPS for phone GPS.
+3. Then steps 4-9 as listed in the frontend step 1 entry.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 
 ## Conventions for whoever continues

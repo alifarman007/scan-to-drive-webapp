@@ -29,9 +29,7 @@
   },
   "placeholder": {
     "title": "This screen is being built",
-    "body": "It arrives in step {step} of the frontend build.",
-    "driverTitle": "Driver sign-in comes next",
-    "driverBody": "The driver screens are built in steps 2 and 3."
+    "body": "It arrives in step {step} of the frontend build."
   },
   "nav": {
     "main": "Main menu",
@@ -81,5 +79,62 @@
     "alert": "Alert",
     "maintenance": "Maintenance",
     "inactive": "Inactive"
+  },
+  "driverAuth": {
+    "pageTitle": "Driver sign in",
+    "eyebrow": "Driver",
+    "signInTitle": "Sign in",
+    "signInLead": "Use your employee ID and 4-digit PIN. This phone keeps you signed in for 30 days.",
+    "employeeId": "Employee ID",
+    "employeeIdPlaceholder": "e.g. EMP-6061",
+    "pin": "4-digit PIN",
+    "firstTimeHint": "First time? Type any 4 digits. You will choose your own PIN on the next screen.",
+    "signIn": "Sign in",
+    "choosePinTitle": "Choose your PIN",
+    "choosePinLead": "Pick 4 digits you will remember. Easy ones like 1111 or 1234 are not allowed.",
+    "newPin": "New PIN",
+    "confirmPinTitle": "Type the PIN again",
+    "confirmPinLead": "Just to be sure it is right.",
+    "confirmPin": "New PIN again",
+    "savePin": "Save PIN and sign in",
+    "back": "Back",
+    "welcome": "Welcome, {name}",
+    "forgotPin": "Forgot your PIN? Ask the transport office to reset it.",
+    "errWrong": "Employee ID or PIN is not correct.",
+    "errLocked": "Too many wrong tries. Wait 15 minutes or ask the transport office.",
+    "errWeak": "This PIN is too easy to guess. Choose another one.",
+    "errMismatch": "The two PINs are different. Try again.",
+    "errAlreadySet": "Your PIN is already set. Sign in with it, or ask the transport office to reset it.",
+    "errNetwork": "No connection. Check the Wi-Fi and try again.",
+    "errServer": "Something went wrong. Please try again."
+  },
+  "driverHome": {
+    "morning": "Good morning",
+    "afternoon": "Good afternoon",
+    "evening": "Good evening",
+    "scanTitle": "Scan the QR sticker in the car",
+    "scanBody": "Open your phone camera and point it at the sticker in the car. The car page opens by itself.",
+    "typeCode": "No sticker? Type the car code",
+    "carCode": "Car code",
+    "carCodePlaceholder": "CAR-01",
+    "open": "Open",
+    "activeTitle": "You have an open trip",
+    "openTrip": "Open trip",
+    "signOut": "Sign out",
+    "offlineTitle": "Can't reach the server",
+    "offlineBody": "Check that the backend is running, then reload this page.",
+    "tripStatus": {
+      "waiting_for_passenger": "Waiting for passenger",
+      "in_progress": "On trip",
+      "waiting_for_end_confirm": "Waiting for end confirmation"
+    }
+  },
+  "carPage": {
+    "title": "Car {code}",
+    "body": "The car page with the start form arrives in step 3 of the build.",
+    "back": "Back to my page"
+  },
+  "pinInput": {
+    "digitsEntered": "{count} of 4 digits entered"
   }
 }

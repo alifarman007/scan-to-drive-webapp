@@ -36,7 +36,7 @@ export default async function DashboardPage() {
           <Stagger className="grid grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))] gap-3 rounded-2xl bg-bay p-3">
             {Array.from({ length: 10 }, (_, i) => (
               <StaggerItem key={i}>
-                <div className="flex h-32 flex-col gap-2.5 rounded-control border border-border bg-card p-3">
+                <div className="flex h-32 flex-col gap-2.5 rounded-[0.875rem] border border-border bg-card p-3">
                   <span className="skeleton h-4 w-16 rounded-full" />
                   <span className="skeleton h-6 w-24 rounded-full" />
                   <span className="skeleton h-3 w-full rounded-full" />

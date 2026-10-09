@@ -45,8 +45,8 @@ def test_admin_adds_a_driver_who_then_chooses_a_pin(client, db):
     assert audit(db, "driver_created", "driver_id", d["id"])[0].actor == f"admin:{admin.username}"
     # the new driver signs in: PIN not set yet, then sets one, then signs in with it
     assert client.post("/api/auth/driver/login", json={"employee_id": "D-NEW-1", "pin": "1234"}).status_code == 409
-    assert client.post("/api/auth/driver/set-pin", json={"employee_id": "D-NEW-1", "pin": "1234"}).status_code == 200
-    assert client.post("/api/auth/driver/login", json={"employee_id": "D-NEW-1", "pin": "1234"}).status_code == 200
+    assert client.post("/api/auth/driver/set-pin", json={"employee_id": "D-NEW-1", "pin": "2580"}).status_code == 200
+    assert client.post("/api/auth/driver/login", json={"employee_id": "D-NEW-1", "pin": "2580"}).status_code == 200
     assert req(client, admin, "GET", f"/drivers/{d['id']}").json()["driver"]["has_pin"] is True
 
 
@@ -84,8 +84,8 @@ def test_reset_pin(client, db):
     r = req(client, admin, "POST", f"/drivers/{driver.id}/reset-pin")
     assert r.status_code == 200 and r.json()["driver"]["has_pin"] is False
     assert client.post("/api/auth/driver/login", json={"employee_id": driver.employee_id, "pin": "1234"}).status_code == 409
-    assert client.post("/api/auth/driver/set-pin", json={"employee_id": driver.employee_id, "pin": "5678"}).status_code == 200
-    assert client.post("/api/auth/driver/login", json={"employee_id": driver.employee_id, "pin": "5678"}).status_code == 200
+    assert client.post("/api/auth/driver/set-pin", json={"employee_id": driver.employee_id, "pin": "4815"}).status_code == 200
+    assert client.post("/api/auth/driver/login", json={"employee_id": driver.employee_id, "pin": "4815"}).status_code == 200
     assert audit(db, "driver_pin_reset", "driver_id", driver.id)
     assert req(client, admin, "POST", "/drivers/999999/reset-pin").status_code == 404
 

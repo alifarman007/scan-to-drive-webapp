@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:lan": "node scripts/dev-lan.mjs",
     "build": "next build",
     "start": "next start",
+    "start:lan": "next start --hostname 0.0.0.0",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
@@ -33,6 +35,7 @@
     "@types/react-dom": "19.3.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.6",
+    "qrcode": "1.5.4",
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3"
   }

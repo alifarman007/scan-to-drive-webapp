@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     pdf_font_path: str | None = None
     pdf_font_bold_path: str | None = None
 
+    # Session cookies are marked "Secure" (sent over HTTPS only). Leave empty to decide from ENVIRONMENT:
+    # on in production, off in development so plain http://<laptop-ip>:3000 works on test phones.
+    cookie_secure: bool | None = None
+
     # Origins allowed to call the API from a browser (the Next.js dev server).
     cors_origins: list[str] = ["http://localhost:3000"]
 
@@ -48,3 +52,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def cookies_secure() -> bool:
+    return settings.cookie_secure if settings.cookie_secure is not None else settings.environment == "production"

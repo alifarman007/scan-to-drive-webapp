@@ -30,7 +30,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       {/* phone top bar + drawer */}
       <Dialog.Root open={open} onOpenChange={setOpen}>
         <div className="sticky top-0 z-30 flex h-16 items-center justify-between bg-side px-4 lg:hidden">
-          <Wordmark name={t("app.name")} company={t("app.company")} />
+          <Wordmark name={t("app.name")} />
           <Dialog.Trigger asChild>
             <button
               type="button"
@@ -91,7 +91,7 @@ function Sidebar({ layoutGroup, onNavigate }: { layoutGroup: string; onNavigate?
   return (
     <nav aria-label={t("nav.main")} className="flex h-full flex-col gap-6 overflow-y-auto bg-side px-3.5 py-5">
       <div className="px-2">
-        <Wordmark name={t("app.name")} company={t("app.company")} />
+        <Wordmark name={t("app.name")} />
       </div>
       <ul className="flex flex-col gap-1">
         {MAIN_NAV.map((item) => (
