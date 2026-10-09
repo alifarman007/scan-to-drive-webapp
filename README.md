@@ -258,6 +258,30 @@ Alert types already raised elsewhere: `km_gap` (start trip), `high_km` (end trip
 Decisions: the admin "reminder" is the alert itself; the driver reminder is an in-app banner. A solved alert is never raised again for the same trip/stage. Not built:
 the PDF's reminder for maintenance, and the nightly backup job (belongs to deployment).
 
+### 2026-10-09 (admin dashboard, trip history, trip detail, audit log)
+
+PDF 11.1, 11.2 and section 15. Read only, **no database change**. Admin and viewer may use everything except the audit log (admin only, as in the PDF API table).
+
+- [x] `GET /api/admin/dashboard`: `cards` (cars on trip, cars available, trips waiting for confirm, trips today, km today, open alerts), `car_board` (every car with
+      `state` = `on_trip` / `waiting` / `available` / `maintenance` / `inactive`, current km and its open trip), `live_trips` (open trips with driver phone and minutes running),
+      the 10 newest open `alerts`, and `charts` (km per car this month, trips per day this month).
+- [x] `GET /api/admin/trips`: trip history, newest first. Filters: `q` (search trip no, car, driver, passenger, visitor name/phone, places, purpose), `range` = `today` / `week` / `month`,
+      `date_from` / `date_to`, `status`, `car_id`, `driver_id`, `department`, `approval`, `needs_review`, `limit` (max 200), `offset`. Returns `total` and `total_km` of the filtered set.
+      Click a car on the board = this list with `car_id`.
+- [x] `GET /api/admin/trips/{id}`: full detail: driver, passenger or visitor, car, GPS map points, `photos.start` / `photos.end` links, `timeline` (every audit event with a readable `label`,
+      actor, IP, device, GPS, details) and the trip's alerts.
+- [x] `GET /api/admin/photos/{trip_id}/{kind}?exp=&sig=`: the photo behind a **short-lived signed link** (10 minutes, HMAC with `SECRET_KEY`). An `<img>` tag cannot send a sign-in header,
+      so the trip detail hands out these links. Open the trip again for fresh links.
+- [x] `GET /api/admin/audit`: audit log search (admin only). Filters: `q` (event, actor, IP, device and the details text), `event`, `actor`, `trip_id`, `date_from`, `date_to`, `limit`, `offset`.
+- [x] 23 new tests (`tests/test_admin_views.py`), **182 in total pass**.
+- [ ] **To verify:** unzip over the repo, `pytest -q` (expect 182). In Swagger as admin: `GET /api/admin/dashboard`, `GET /api/admin/trips?range=today`, copy a trip id, `GET /api/admin/trips/{id}`,
+      paste a `photos.start.url` into the browser address bar after `http://localhost:8000` (it shows the photo), then `GET /api/admin/audit?trip_id={id}`.
+
+Decisions: "today", "this month" and the date filters use **Bangladesh days (UTC+6)**; the week starts on **Sunday** (change in `services/timeutil.py` if the company counts differently). Km totals count
+only finished trips (completed, closed by admin), by the day the trip ended; "trips today" counts trips started today except cancelled ones. A car with a trip waiting for confirmation shows as `waiting`
+(also after the driver ended it), a car in maintenance without an open trip shows `maintenance`. Not built here: CSV/Excel/PDF export of the audit log and trip log (comes with the reports step), the
+single-car detail page (comes with cars CRUD; use the history filter for the car's trips meanwhile), live push updates (the front end can poll the dashboard every 15-30 seconds).
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -352,6 +376,11 @@ New migration after changing models: `alembic revision --autogenerate -m "messag
 | POST | `/api/admin/trips/{id}/approval` | admin | approve or reject (rejection needs a note) |
 | GET | `/api/admin/alerts` | admin / viewer | alerts list (filter by status and type) |
 | POST | `/api/admin/alerts/{id}/solve` | admin | mark an alert as solved, with a note |
+| GET | `/api/admin/dashboard` | admin / viewer | cards, car board, live trips, alerts, charts |
+| GET | `/api/admin/trips` | admin / viewer | trip history with filters and search |
+| GET | `/api/admin/trips/{id}` | admin / viewer | trip detail: people, map points, photo links, timeline, alerts |
+| GET | `/api/admin/photos/{trip_id}/{kind}` | signed link | dashboard photo, link valid 10 minutes |
+| GET | `/api/admin/audit` | admin | audit log search |
 | POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
@@ -384,8 +413,10 @@ backend/
   app/routers/trips.py     start trip, active trip, new Start QR, cancel, end trip, new End QR
   app/routers/admin_trips.py admin close, unlock, approvals
   app/routers/admin_alerts.py alerts list and solve
+  app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
   app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
   app/worker.py            background worker (alert checks every minute)
+  app/services/timeutil.py Bangladesh days for dashboards and filters
   app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
                            phone normalizing (phones.py)
   app/storage.py           photo storage (local folder now, Azure Blob later)
@@ -397,6 +428,7 @@ backend/
   tests/test_trips.py      car page and start-trip tests
   tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
   tests/test_admin_trips.py admin close and unlock
+  tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
@@ -405,9 +437,8 @@ frontend/                  not started
 
 ## Next steps
 
-1. Verify the unchecked items above (alerts and reminders) on the developer machine and commit.
-2. Backend, next pieces in this order: admin dashboard and trip history API (with photos and timeline), audit log search;
-   admin CRUD, passenger import, reports and Excel/PDF export; admin photo access. Endpoint list: PDF section 15.
+1. Verify the unchecked items above (admin dashboard and history) on the developer machine and commit.
+2. Backend, next pieces in this order: admin CRUD (cars and QR sticker PDF, drivers with PIN reset, passengers with Excel import, users, settings), then reports and Excel/PDF export. Endpoint list: PDF section 15.
 3. Frontend (Next.js + Tailwind + shadcn/ui, Bangla/English): driver, passenger (with the Employee / Others choice) and admin
    screens (PDF sections 10-11). Test the phone camera over HTTPS (Microsoft Dev Tunnels or mkcert).
 4. Docker Compose setup, then Azure deployment (needs the company's Azure access and a sub-domain).
