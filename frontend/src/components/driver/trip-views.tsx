@@ -105,7 +105,12 @@ function PassengerRow({ trip }: { trip: Trip }) {
         <span className="truncate font-bold">{name ?? t("passengerUnconfirmed")}</span>
         <span className="text-sm text-muted">{trip.is_visitor ? t("visitor") : t("employee")}</span>
       </div>
-      {trip.start_no_scan_reason ? (
+      {trip.start_no_scan_reason && name && trip.end_confirm_time ? (
+        // nobody confirmed the start, but the passenger said who they are at the end
+        <StatusChip status="available" size="sm">
+          {t("confirmedAtEnd")}
+        </StatusChip>
+      ) : trip.start_no_scan_reason ? (
         <StatusChip status="waiting" size="sm">
           {t("notConfirmed")}
         </StatusChip>

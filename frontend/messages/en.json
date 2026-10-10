@@ -354,7 +354,8 @@
     "cantScanConfirmStart": "Start without confirmation",
     "cantScanConfirmEnd": "Finish without confirmation",
     "blockedShort": "Blocked",
-    "noCodeShort": "No code on screen"
+    "noCodeShort": "No code on screen",
+    "endBodyIdentify": "The start was not confirmed, so they scan it and say who they are (employee ID, or name and phone)."
   },
   "reasons": {
     "cancel1": "The passenger did not come",
@@ -402,13 +403,14 @@
     "odometerNow": "Odometer now",
     "distance": "Distance",
     "duration": "Time",
-    "pendingApproval": "The passenger could not confirm, so the transport office will approve this trip.",
+    "pendingApproval": "A step of this trip was not confirmed by the passenger, so the transport office will approve it.",
     "done": "Done",
     "closedTitle": "The transport office closed this trip",
     "cancelledTitle": "This trip was cancelled",
     "backHome": "Back to my page",
     "passengerConfirmed": "Passenger confirmed",
-    "haveAGoodTrip": "Have a good trip. Drive safely."
+    "haveAGoodTrip": "Have a good trip. Drive safely.",
+    "confirmedAtEnd": "Confirmed at the end"
   },
   "passenger": {
     "pageTitle": "Confirm your trip",
@@ -477,7 +479,8 @@
       "PASSENGER_IS_DRIVER": "This is the driver's ID. Please type your own employee ID.",
       "VISITORS_NOT_ALLOWED": "Visitors cannot be confirmed here. Please ask the transport office.",
       "WRONG_PASSENGER_TYPE": "This trip was started by a different kind of passenger. Ask the driver to check.",
-      "checkFields": "Please check what you typed."
+      "checkFields": "Please check what you typed.",
+      "NAME_REQUIRED": "Please type your name."
     },
     "dead": {
       "QR_INVALID": {
@@ -524,7 +527,9 @@
         "title": "Something went wrong",
         "body": "Ask the driver to show the QR code again and scan it once more."
       }
-    }
+    },
+    "identifyNote": "The start of this trip was not confirmed, so please tell us who you are. This confirms the end of the trip.",
+    "phoneHintEnd": "So the transport office can reach you about this trip if needed."
   },
   "adminAuth": {
     "pageTitle": "Transport office sign in",

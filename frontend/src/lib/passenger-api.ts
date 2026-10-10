@@ -35,6 +35,9 @@ export type EndPage = {
   };
   photos: { start: string; end: string };
   confirm_as: "employee" | "visitor";
+  /** nobody confirmed the start ("Passenger can't scan"): the passenger says who they are here */
+  identify: boolean;
+  allow_visitors: boolean;
   expires_at: string;
   tries_left: number;
   opened_by_driver: boolean;
@@ -61,6 +64,9 @@ export const passengerApi = {
     api<EndConfirmed>(`${at(token)}/confirm-end`, {
       json: as === "employee" ? { passenger_type: "employee", employee_id: value } : { passenger_type: "visitor", phone: value },
     }),
+  /** End QR when nobody confirmed the start: a visitor gives name and phone (and a reason) here. */
+  identifyVisitorAtEnd: (token: string, v: { name: string; phone: string; reason?: string }) =>
+    api<EndConfirmed>(`${at(token)}/confirm-end`, { json: { passenger_type: "visitor", ...v, reason: v.reason || undefined } }),
 };
 
 /** Errors after which this code cannot be used any more: the page switches to a full-screen notice. */

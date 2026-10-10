@@ -89,7 +89,13 @@ export function QrView({
         <div className="flex flex-col gap-1 text-center">
           <h1 className="font-display text-[1.4rem] leading-tight font-bold">{stage === "start" ? t("startTitle") : t("endTitle")}</h1>
           <p className="text-sm text-[#c9d3ea]">
-            {stage === "start" ? t("startBody") : trip.is_visitor ? t("endBodyVisitor") : t("endBody")}
+            {stage === "start"
+              ? t("startBody")
+              : trip.start_no_scan_reason && !trip.passenger_name
+                ? t("endBodyIdentify")
+                : trip.is_visitor
+                  ? t("endBodyVisitor")
+                  : t("endBody")}
           </p>
         </div>
 

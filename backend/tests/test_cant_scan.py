@@ -109,6 +109,63 @@ def test_both_stages_skipped(client, db):
     assert t["start_no_scan_reason"] and t["end_no_scan_reason"] and t["status"] == "completed"
 
 
+# ---- start skipped, passenger confirms the end ------------------------------------------------
+
+def unconfirmed_trip_at_end(client, db):
+    """Start skipped with "Passenger can't scan", driver ended: returns (driver, trip_id, raw End QR)."""
+    driver, car, trip_id, _ = waiting_trip(client, db)
+    cant_scan(client, driver, trip_id)
+    return driver, trip_id, token_of(end(client, driver, trip_id).json()["end_qr"])
+
+
+def test_end_page_asks_who_the_passenger_is_when_the_start_was_skipped(client, db):
+    _, _, raw = unconfirmed_trip_at_end(client, db)
+    page = client.get(f"/api/p/{raw}").json()
+    assert page["identify"] is True and page["allow_visitors"] is True
+    # a normal trip does not ask
+    driver, car, p, trip_id = running_trip(client, db)
+    normal = token_of(end(client, driver, trip_id).json()["end_qr"])
+    assert client.get(f"/api/p/{normal}").json()["identify"] is False
+    assert client.post(f"/api/p/{normal}/lookup", json={"employee_id": p.employee_id}).status_code == 409
+
+
+def test_employee_identifies_at_the_end_and_the_trip_still_waits_for_approval(client, db):
+    _, trip_id, raw = unconfirmed_trip_at_end(client, db)
+    p = make_passenger(db, name="Faruk Ahmed")
+    # the name check works on the End QR too, and a wrong ID counts as a wrong try
+    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": "EMP-NOPE"})
+    assert r.status_code == 404 and r.json()["detail"]["tries_left"] == 4
+    assert client.post(f"/api/p/{raw}/lookup", json={"employee_id": p.employee_id.lower()}).json() == {"name": "Faruk Ahmed"}
+    r = confirm_end(client, raw, employee_id=p.employee_id)
+    assert r.status_code == 200
+    t = db.get(Trip, trip_id)
+    db.refresh(t)
+    assert t.status.value == "completed" and t.passenger_id == p.id and t.end_confirm_time is not None
+    assert t.approval_status == "pending" and t.needs_review is True  # the skipped start is still for the office
+    assert events(db, "trip_completed", trip_id)[0].detail["identified_at_end"] is True
+
+
+def test_visitor_identifies_at_the_end(client, db):
+    _, trip_id, raw = unconfirmed_trip_at_end(client, db)
+    no_name = client.post(f"/api/p/{raw}/confirm-end", json={"passenger_type": "visitor", "phone": "01711 223344"})
+    assert no_name.status_code == 422 and no_name.json()["detail"]["code"] == "NAME_REQUIRED"
+    r = client.post(f"/api/p/{raw}/confirm-end", json={"passenger_type": "visitor", "phone": "01711 223344",
+                                                      "name": "Rahim Uddin", "reason": "Audit"})
+    assert r.status_code == 200
+    t = db.get(Trip, trip_id)
+    db.refresh(t)
+    assert t.is_visitor and t.visitor_name == "Rahim Uddin" and t.visitor_phone == "01711 223344"
+
+
+def test_driver_cannot_identify_as_the_passenger_at_the_end(client, db):
+    driver, _, raw = unconfirmed_trip_at_end(client, db)
+    from app.models import Passenger
+    db.add(Passenger(employee_id=driver.employee_id, name=driver.name))  # drivers are often in the staff list too
+    db.flush()
+    r = confirm_end(client, raw, employee_id=driver.employee_id)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "PASSENGER_IS_DRIVER"
+
+
 # ---- admin approval ---------------------------------------------------------------------------
 
 def test_admin_sees_and_approves_pending_trips(client, db):

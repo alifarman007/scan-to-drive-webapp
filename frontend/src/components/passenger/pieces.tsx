@@ -237,7 +237,7 @@ export function useErrorText(typed: "id" | "phone" = "id") {
     if (err.code === "ID_NOT_FOUND") return left !== null ? t("idNotFoundLeft", { left }) : t("idNotFound");
     if (err.code === "ID_MISMATCH" && typed === "phone") return left !== null ? t("phoneMismatchLeft", { left }) : t("phoneMismatch");
     if (err.code === "ID_MISMATCH") return left !== null ? t("mismatchLeft", { left }) : t("mismatch");
-    if (["DRIVER_CANNOT_CONFIRM", "PASSENGER_IS_DRIVER", "VISITORS_NOT_ALLOWED", "WRONG_PASSENGER_TYPE"].includes(err.code)) return t(err.code);
+    if (["DRIVER_CANNOT_CONFIRM", "PASSENGER_IS_DRIVER", "VISITORS_NOT_ALLOWED", "WRONG_PASSENGER_TYPE", "NAME_REQUIRED"].includes(err.code)) return t(err.code);
     if (err.status === 422) return t("checkFields");
     return t("generic");
   };

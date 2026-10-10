@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleNotchIcon, FlagCheckeredIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { CircleNotchIcon, FlagCheckeredIcon, InfoIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
@@ -11,6 +11,7 @@ import { Odometer } from "@/components/ui/odometer";
 import { Reveal, Stagger, StaggerItem } from "@/components/ui/reveal";
 import { PHONE_RE, passengerApi, type EndConfirmed, type EndPage } from "@/lib/passenger-api";
 
+import { EmployeeForm, SlideSwap, VisitorForm, WhoPicker, type Mode } from "./identity-forms";
 import { CodeTimer, DeadCode, ErrorText, PhotoButton, Shake, SuccessMark, TripCard, useErrorText } from "./pieces";
 
 /** Km in the digits printed on the car's odometer, also in Bangla. */
@@ -76,11 +77,63 @@ export function EndFlow({ token, page }: { token: string; page: EndPage }) {
             {t("driversPhone")}
           </p>
         </Reveal>
+      ) : page.identify ? (
+        <Reveal delay={0.14}>
+          <IdentifyAtEnd token={token} page={page} onDone={setDone} onDead={setDead} />
+        </Reveal>
       ) : (
         <Reveal delay={0.14}>
           <EndForm token={token} as={page.confirm_as} triesLeft={page.tries_left} onDone={setDone} onDead={setDead} />
         </Reveal>
       )}
+    </div>
+  );
+}
+
+/**
+ * The driver used "Passenger can't scan" at the start, so there is nobody to match. The passenger says who they
+ * are now (same as on the Start QR) and that confirms the end. The office still checks the trip.
+ */
+function IdentifyAtEnd({
+  token,
+  page,
+  onDone,
+  onDead,
+}: {
+  token: string;
+  page: EndPage;
+  onDone: (trip: EndConfirmed["trip"]) => void;
+  onDead: (code: string) => void;
+}) {
+  const t = useTranslations("passenger");
+  const [mode, setMode] = useState<Mode>("employee");
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="flex items-start gap-2.5 rounded-2xl bg-soft px-4 py-3.5 text-sm text-title">
+        <InfoIcon size={20} weight="fill" className="mt-px shrink-0 text-accent" />
+        {t("identifyNote")}
+      </p>
+      {page.allow_visitors ? <WhoPicker mode={mode} onChange={setMode} pillId="who-pill-end" /> : null}
+      <SlideSwap mode={mode}>
+        {mode === "employee" ? (
+          <EmployeeForm
+            token={token}
+            triesLeft={page.tries_left}
+            confirm={(id) => passengerApi.confirmEnd(token, "employee", id).then((r) => r.trip)}
+            confirmLabel={t("confirmEnd")}
+            onDone={onDone}
+            onDead={onDead}
+          />
+        ) : (
+          <VisitorForm
+            confirm={(v) => passengerApi.identifyVisitorAtEnd(token, v).then((r) => r.trip)}
+            confirmLabel={t("confirmEnd")}
+            phoneHint={t("phoneHintEnd")}
+            onDone={onDone}
+            onDead={onDead}
+          />
+        )}
+      </SlideSwap>
     </div>
   );
 }

@@ -59,9 +59,12 @@ class EndEmployeeConfirm(BaseModel):
 
 
 class EndVisitorConfirm(BaseModel):
-    """A visitor proves it is the same person by repeating the phone number given at the start."""
+    """A visitor proves it is the same person by repeating the phone number given at the start.
+    `name` and `reason` are only used when nobody confirmed the start (see `_start_unconfirmed`)."""
     passenger_type: Literal["visitor"]
     phone: Phone
+    name: Name | None = None
+    reason: Reason | None = None
 
 
 ConfirmEndBody = Annotated[EndEmployeeConfirm | EndVisitorConfirm, Field(discriminator="passenger_type")]
@@ -81,6 +84,34 @@ def _reject_drivers_own_phone(driver_id: int | None, trip) -> None:
     if driver_id is not None and driver_id == trip.driver_id:
         raise api_error(403, "DRIVER_CANNOT_CONFIRM",
                         "The driver cannot confirm for the passenger. Ask the passenger to scan with their own phone.")
+
+
+def _start_unconfirmed(trip) -> bool:
+    """The driver used "Passenger can't scan" at the start: the trip has a passenger, but nobody is on record.
+    The End QR then asks the passenger who they are (instead of matching against nobody)."""
+    return trip.with_passenger and trip.passenger_id is None and not trip.is_visitor
+
+
+def _identify(db: Session, request: Request, row, trip, body) -> tuple[str, str, dict]:
+    """Put the passenger on the trip: an employee by ID, or a visitor by name and phone.
+    Returns (name to show, audit actor, audit detail). Raises the same errors as the start page."""
+    if body.passenger_type == "employee":
+        passenger = _find_passenger(db, body.employee_id)
+        if passenger is None:
+            left = register_wrong_try(db, request, row, trip, body.employee_id)
+            raise api_error(404, "ID_NOT_FOUND", "ID not found", tries_left=left)
+        if passenger.employee_id.upper() == trip.driver.employee_id.upper():
+            raise api_error(403, "PASSENGER_IS_DRIVER", "The driver cannot be the passenger of the same trip")
+        trip.passenger_id = passenger.id
+        return passenger.name, f"passenger:{passenger.employee_id}", {"passenger": passenger.employee_id}
+    if not app_settings.get_int(db, "allow_visitors"):
+        raise api_error(403, "VISITORS_NOT_ALLOWED", "Please use your employee ID")
+    if not body.name:
+        raise api_error(422, "NAME_REQUIRED", "Please type your name")
+    trip.is_visitor = True
+    trip.visitor_name, trip.visitor_phone, trip.visitor_reason = body.name, body.phone, body.reason or None
+    trip.needs_review = True  # visitor trips are listed for the admin to review
+    return body.name, f"visitor:{body.phone}", {"visitor": body.name, "phone": body.phone, "reason": body.reason or None}
 
 
 def _minutes(start: datetime | None, end: datetime | None) -> int | None:
@@ -130,6 +161,9 @@ def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = D
         },
         "photos": {"start": f"/api/p/{token}/photo/start", "end": f"/api/p/{token}/photo/end"},
         "confirm_as": "visitor" if trip.is_visitor else "employee",  # which box the page shows
+        # nobody confirmed the start: the page asks who the passenger is (employee ID or visitor details)
+        "identify": _start_unconfirmed(trip),
+        "allow_visitors": bool(app_settings.get_int(db, "allow_visitors")),
         "expires_at": row.expires_at,
         "tries_left": left,
         "opened_by_driver": opened_by_driver,
@@ -168,8 +202,10 @@ def trip_photo(
 @router.post("/{token}/lookup")
 def lookup_employee(token: str, body: LookupBody, request: Request, db: Session = Depends(get_db)):
     """Show the employee's NAME (only) for the typed ID, so a typo is noticed before confirming.
-    A wrong ID counts toward the wrong-ID limit of the trip. Start QR only."""
-    row, trip = resolve_token(db, token, TripStage.start, lock=True)
+    A wrong ID counts toward the wrong-ID limit of the trip. Start QR, or an End QR when nobody confirmed the start."""
+    row, trip = resolve_token(db, token, lock=True)
+    if row.kind == TripStage.end and not _start_unconfirmed(trip):
+        raise api_error(409, "WRONG_QR", "This QR code is for a different step of the trip")
     if lookups_for_trip(db, trip.id) >= MAX_LOOKUPS_PER_TRIP:
         raise api_error(429, "TOO_MANY_LOOKUPS", "Too many tries. Please ask the driver or the admin.")
 
@@ -195,24 +231,7 @@ def confirm_start(
     row, trip = resolve_token(db, token, TripStage.start, lock=True)
     _reject_drivers_own_phone(driver_id, trip)
 
-    if isinstance(body, EmployeeConfirm):
-        passenger = _find_passenger(db, body.employee_id)
-        if passenger is None:
-            left = register_wrong_try(db, request, row, trip, body.employee_id)
-            raise api_error(404, "ID_NOT_FOUND", "ID not found", tries_left=left)
-        if passenger.employee_id.upper() == trip.driver.employee_id.upper():
-            raise api_error(403, "PASSENGER_IS_DRIVER", "The driver cannot be the passenger of the same trip")
-        trip.passenger_id = passenger.id
-        who, actor = passenger.name, f"passenger:{passenger.employee_id}"
-        detail = {"passenger": passenger.employee_id}
-    else:
-        if not app_settings.get_int(db, "allow_visitors"):
-            raise api_error(403, "VISITORS_NOT_ALLOWED", "Please use your employee ID")
-        trip.is_visitor = True
-        trip.visitor_name, trip.visitor_phone, trip.visitor_reason = body.name, body.phone, body.reason or None
-        trip.needs_review = True  # visitor trips are listed for the admin to review
-        who, actor = body.name, f"visitor:{body.phone}"
-        detail = {"visitor": body.name, "phone": body.phone, "reason": body.reason or None}
+    who, actor, detail = _identify(db, request, row, trip, body)
 
     now = datetime.now(timezone.utc)
     trip.status = TripStatus.in_progress
@@ -245,25 +264,32 @@ def confirm_end(
     db: Session = Depends(get_db),
     driver_id: int | None = Depends(optional_driver_id),
 ):
-    """P4/S7: the passenger confirms the end with the SAME ID (or phone, for a visitor). Trip is completed."""
+    """P4/S7: the passenger confirms the end with the SAME ID (or phone, for a visitor). Trip is completed.
+    If nobody confirmed the start, the passenger identifies here instead (employee ID, or visitor name + phone)."""
     row, trip = resolve_token(db, token, TripStage.end, lock=True)
     _reject_drivers_own_phone(driver_id, trip)
 
-    expected = "visitor" if trip.is_visitor else "employee"
-    if body.passenger_type != expected:
-        raise api_error(422, "WRONG_PASSENGER_TYPE", f"This trip must be confirmed as: {expected}")
-
-    if isinstance(body, EndEmployeeConfirm):
-        same = trip.passenger is not None and trip.passenger.employee_id.upper() == body.employee_id.strip().upper()
-        typed, actor = body.employee_id, f"passenger:{trip.passenger.employee_id}" if trip.passenger else "passenger:unknown"
-        message = "This ID does not match the passenger who started the trip"
+    identified = None
+    if _start_unconfirmed(trip):
+        # Nobody confirmed the start ("Passenger can't scan"): the passenger says who they are now.
+        # The trip still waits for the office's approval, because the start itself was not confirmed.
+        identified = _identify(db, request, row, trip, body)
+        actor = identified[1]
     else:
-        same = normalize_phone(body.phone) == normalize_phone(trip.visitor_phone or "")
-        typed, actor = body.phone, f"visitor:{trip.visitor_phone}"
-        message = "This phone number does not match the one given at the start of the trip"
-    if not same:
-        left = register_wrong_try(db, request, row, trip, typed)
-        raise api_error(403, "ID_MISMATCH", message, tries_left=left)
+        expected = "visitor" if trip.is_visitor else "employee"
+        if body.passenger_type != expected:
+            raise api_error(422, "WRONG_PASSENGER_TYPE", f"This trip must be confirmed as: {expected}")
+        if isinstance(body, EndEmployeeConfirm):
+            same = trip.passenger is not None and trip.passenger.employee_id.upper() == body.employee_id.strip().upper()
+            typed, actor = body.employee_id, f"passenger:{trip.passenger.employee_id}" if trip.passenger else "passenger:unknown"
+            message = "This ID does not match the passenger who started the trip"
+        else:
+            same = normalize_phone(body.phone) == normalize_phone(trip.visitor_phone or "")
+            typed, actor = body.phone, f"visitor:{trip.visitor_phone}"
+            message = "This phone number does not match the one given at the start of the trip"
+        if not same:
+            left = register_wrong_try(db, request, row, trip, typed)
+            raise api_error(403, "ID_MISMATCH", message, tries_left=left)
 
     now = datetime.now(timezone.utc)
     trip.status = TripStatus.completed
@@ -272,8 +298,10 @@ def confirm_end(
     # The car's current km moves forward only when the trip is completed (PDF S7).
     vehicle = db.scalar(select(Vehicle).where(Vehicle.id == trip.vehicle_id).with_for_update())
     vehicle.current_km = trip.end_km
-    log_event(db, request, "trip_completed", actor, trip_id=trip.id,
-              detail={"end_km": trip.end_km, "distance_km": trip.distance_km})
+    detail = {"end_km": trip.end_km, "distance_km": trip.distance_km}
+    if identified is not None:
+        detail.update(identified[2], identified_at_end=True)
+    log_event(db, request, "trip_completed", actor, trip_id=trip.id, detail=detail)
     db.commit()
 
     return {

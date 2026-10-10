@@ -595,6 +595,29 @@ Frontend:
 Notes: the trip rows and car bays do not open anything yet; the trip detail page is step 6 and the car pages step 7. The search box in the top
 bar is wired up with the trip history (step 6).
 
+### 2026-10-10 (fix: passenger confirms the end after a skipped start)
+
+Found while testing with phones: the driver used "Passenger can't scan" at the start, then at the end the passenger scanned the End QR
+and typed the employee ID. Nobody was on record for the trip, so every ID was "does not match" and used up the tries.
+
+Backend (no database change):
+- [x] When nobody confirmed the start, the End QR page says `identify: true` (and `allow_visitors`). The passenger then says who they are,
+      the same way as on the Start QR: employee ID (name check with `POST /api/p/{token}/lookup`, now allowed on such an End QR), or visitor
+      name + phone (+ reason). That confirms the end, and the passenger is saved on the trip. A wrong ID still counts as a wrong try; the
+      driver's own ID is refused.
+- [x] The trip still waits for the office's approval, because the start itself was not confirmed. The audit log marks it `identified_at_end`.
+- [x] Normal trips are unchanged: same ID or same phone as at the start; lookup on their End QR is refused.
+- [x] 4 new tests, 283 in total pass.
+
+Frontend:
+- [x] End page: a note ("The start of this trip was not confirmed, so please tell us who you are"), then Epic employee / visitor and the
+      same forms as the start page (now shared in `src/components/passenger/identity-forms.tsx`).
+- [x] Driver's End QR screen says the passenger will say who they are (employee ID, or name and phone).
+- [x] Driver's summary shows the passenger with "Confirmed at the end"; the approval note now says a step was not confirmed.
+- [x] Checked in the sandbox: skipped start, end, passenger types an unknown ID (4 tries left), then EMP-2210, name card, confirm; both
+      phones show "Trip complete". The step 4 passenger checks were run again. No browser errors.
+- [ ] To verify on the phones: start a trip, press "Passenger can't scan", drive, end, scan the End QR on the passenger phone and type the ID.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -725,7 +748,7 @@ npm run start:lan             # run the production build for phones (faster than
 | GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning a Start QR (trip details) or an End QR (summary); `opened_by_driver` when opened on the trip driver's own phone |
 | GET | `/api/p/{token}/photo` | anyone with the QR | start dashboard photo (only while the QR is valid) |
 | GET | `/api/p/{token}/photo/{kind}` | anyone with the QR | `start` or `end` dashboard photo |
-| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR only; wrong IDs count toward the limit) |
+| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR, or an End QR when nobody confirmed the start; wrong IDs count toward the limit) |
 | POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
 | POST | `/api/admin/trips/{id}/close` | admin | close any open trip with a reason (optional end km); car and driver are freed |
 | POST | `/api/admin/trips/{id}/unlock` | admin | reset wrong-ID tries of a blocked trip |
@@ -847,6 +870,7 @@ frontend/                  Next.js app
   src/app/driver/trip/     the open trip from Start QR to summary
   src/lib/driver-api.ts    types and calls for the driver screens, QR kept per tab, sticker check; photo.ts shrinks photos
   src/app/p/[token]/       passenger page (Start QR or End QR, or a notice when the code cannot be used)
+  src/components/passenger/identity-forms.tsx "who are you" forms (employee ID with name check, visitor), used on both pages
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
   src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), trips running now, two charts
