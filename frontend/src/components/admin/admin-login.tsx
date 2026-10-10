@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 
+import { REPLAY_INTRO } from "@/components/preloader";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { ApiError, NETWORK_ERROR, api } from "@/lib/api";
@@ -49,6 +50,12 @@ export function AdminLogin({ next, expired }: { next: string; expired: boolean }
     try {
       await api<LoginResponse>("/auth/admin/login", { json: { username: username.trim(), password } });
       setDone(true);
+      // play the opening screen again on the way in
+      try {
+        sessionStorage.removeItem(REPLAY_INTRO);
+      } catch {
+        /* private mode: no opening screen, fine */
+      }
       // a full page load: the admin pages are read fresh with the new session
       setTimeout(() => window.location.replace(next), 550);
     } catch (err) {

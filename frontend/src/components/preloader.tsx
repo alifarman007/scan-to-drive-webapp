@@ -14,6 +14,14 @@ if(location.pathname.indexOf('/p/')===0||sessionStorage.getItem('s2d.intro')){d.
 sessionStorage.setItem('s2d.intro','1');d.classList.add('s2d-intro');
 setTimeout(function(){d.classList.add('s2d-intro-done')},3600);}catch(e){document.documentElement.classList.add('s2d-no-intro');}})();`;
 
+/** The deciding script, for the page <head> (runs before the first paint). */
+export function PreloaderScript() {
+  return <script dangerouslySetInnerHTML={{ __html: DECIDE }} />;
+}
+
+/** Ask for the opening screen on the next page load in this tab (used after signing in). */
+export const REPLAY_INTRO = "s2d.intro";
+
 export function Preloader() {
   // each letter knows its place in the whole motto, for the letter-by-letter delay
   const words = MOTTO.split(" ").map((w, wi, all) => {
@@ -22,7 +30,6 @@ export function Preloader() {
   });
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: DECIDE }} />
       <div className="s2d-preloader" aria-hidden="true">
         <div className="s2d-preloader__glow" />
         <div className="s2d-preloader__stage">

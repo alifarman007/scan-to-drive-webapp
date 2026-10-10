@@ -10,7 +10,8 @@ import type { Status } from "@/components/ui/status-chip";
 /** A number that counts up to its new value (km today, trips today ...). */
 export function CountUp({ value, className }: { value: number; className?: string }) {
   const reduce = useReducedMotion();
-  const mv = useMotionValue(reduce ? value : 0);
+  // always 0 on the first render (server and browser agree), then count up, or jump straight there with reduce motion
+  const mv = useMotionValue(0);
   const text = useTransform(mv, (v) => Math.round(v).toLocaleString("en-US"));
   useEffect(() => {
     if (reduce) {
