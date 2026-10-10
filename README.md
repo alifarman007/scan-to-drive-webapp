@@ -552,6 +552,49 @@ Frontend:
 Notes: the passenger only needs the phone's normal camera app (the QR is a normal link), no app to install. If the passenger's phone has no
 internet, the driver still has "Passenger can't scan". The page does not keep anything on the passenger's phone.
 
+### 2026-10-10 (frontend step 5: admin sign-in, live dashboard)
+
+Backend (no database change):
+- [x] Admin sign-in ignores letter case and spaces around the username (`Admin` = `admin`), and wrong tries in any letter case count toward
+      the same lockout.
+- [x] 1 new test, 279 in total pass.
+
+Frontend:
+- [x] Admin pages are protected. Without a session, any `/admin/...` address goes to `/admin/login` and comes back to the same page after
+      signing in (`src/proxy.ts` checks the cookie is there, the admin layout checks it with the backend). When the 8 hours run out, or the
+      account is turned off, the next page or the next dashboard refresh goes to sign-in with "Your session has ended" and comes back afterwards.
+      Backend not running: a "Can't reach the server" notice instead of a sign-in loop.
+- [x] Sign-in page `/admin/login`: navy brand panel with a road drawn behind it (dashes moving), the form on the right (on phones the panel is on
+      top). Username, password with a show / hide button, clear messages for wrong details, lockout and no connection, a short tick on success.
+- [x] Top bar: avatar with the username; its menu shows the role (Admin or Viewer, and what that role can do) and "Sign out". Viewers also see a
+      "View only" badge, and buttons that change things are not shown to them.
+- [x] Dashboard `/admin`, live (asks the server every 15 seconds while the page is on screen, and straight away when the tab comes back;
+      "Live · time of the last update" at the top, or "Connection lost" with the time of the numbers shown; refresh button):
+  - Greeting for the time of day and today's date.
+  - Six numbers that count up: cars on a trip now, cars free, trips waiting for a passenger to confirm, trips today, km driven today, open alerts
+    (opens the alerts page).
+  - Cars right now: every car as a bay with a coloured edge (green free, blue on trip, amber waiting, grey maintenance), the driver, where it is
+    going and for how long (ticking), or its current km. Filter chips with counts (All, On trip, Waiting, Available, Maintenance); the bays move
+    into place when the filter changes. Two bays per row on phones.
+  - Alerts: newest open alerts with an icon per type and how long ago. Admins can "Solve" with an optional note; the alert slides away and the
+    numbers update. "All alerts" goes to the alerts page (step 7).
+  - Trips running now: car, trip number, driver, passenger (or visitor, or the purpose without a passenger), from and to, status, time running,
+    "Office to check" when the passenger could not scan.
+  - Trips per day this month (columns, today marked, tooltip on hover or tap) and km per car this month (bars, longest first, km written at the end).
+    Both have an empty state for a new month, and the trips chart has the numbers as a table for screen readers.
+  - Driver overtime card with the "Phase 2" tag, to its page.
+- [x] All new texts in English and Bangla. Dark mode checked.
+- [x] Checked in the sandbox with Chromium (laptop 1440 px and phone 390 px), with a month of sample trips, open trips in each state and alerts:
+      sign-in redirect and back, wrong password, `Admin` with spaces, dashboard, board filter, chart tooltip, solving an alert (open alerts 3 to 2),
+      a driver starting a trip while the dashboard is open (shows up by itself within 15 seconds), Bangla and dark, sign-out, viewer (no Solve
+      buttons, "View only"), a broken session cookie (back to sign-in with the note). No browser errors. Lint, types and production build pass.
+- [ ] To verify on the laptop: sign in at `http://localhost:3000/admin` with the admin password the seed printed (or set one with
+      `python -m app.set_password admin`). Keep the dashboard open, start and end a trip with a phone, and watch the board and the numbers change.
+      Sign out, sign in as `viewer`. Run `python -m app.worker` in another window to get real alerts.
+
+Notes: the trip rows and car bays do not open anything yet; the trip detail page is step 6 and the car pages step 7. The search box in the top
+bar is wired up with the trip history (step 6).
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -793,7 +836,7 @@ backend/
 frontend/                  Next.js app
   messages/en.json, bn.json  all texts, English and Bangla
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
-  src/app/                 pages: / (start), /admin/*, /driver, /styleguide (development only)
+  src/app/                 pages: / (start), /admin/* (behind sign-in), /driver, /styleguide (development only)
   src/components/ui/       shared pieces: Button, Input, Card, StatusChip, Odometer, CountdownRing, Reveal, ThemeToggle, LanguageSwitch
   src/components/admin/    admin frame (sidebar, top bar) and the menu list
   src/i18n/                language from the cookie (next-intl)
@@ -804,6 +847,10 @@ frontend/                  Next.js app
   src/app/driver/trip/     the open trip from Start QR to summary
   src/lib/driver-api.ts    types and calls for the driver screens, QR kept per tab, sticker check; photo.ts shrinks photos
   src/app/p/[token]/       passenger page (Start QR or End QR, or a notice when the code cannot be used)
+  src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
+  src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
+  src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), trips running now, two charts
+  src/lib/admin-api.ts     types and calls for the admin pages, back to sign-in when the session ends
   src/components/passenger/ passenger frame, start flow (employee / visitor), end flow, shared pieces (trip card, code timer, photo viewer, notices)
   src/lib/passenger-api.ts types and calls for the passenger pages
   src/lib/api.ts           browser calls to the API (errors, X-S2D header); server-api.ts for server-side checks
@@ -813,9 +860,9 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (frontend step 4) with the laptop and two phones, a full trip with phones only, and commit.
-2. Frontend step 5: admin sign-in and the live dashboard.
-3. Then steps 6-9 as listed in the frontend step 1 entry.
+1. Verify the unchecked items above (frontend step 5) on the laptop, with a phone making trips, and commit.
+2. Frontend step 6: trip history (filters, search) and trip detail (photos, timeline, close / unlock / approve).
+3. Then steps 7-9 as listed in the frontend step 1 entry.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 
 ## Conventions for whoever continues

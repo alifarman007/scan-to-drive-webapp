@@ -33,3 +33,13 @@ export async function getDriverSession(): Promise<{ driver: SessionDriver | null
   const { status, data } = await serverGet<SessionDriver>("/auth/driver/me");
   return { driver: data, offline: status === 0 || status >= 500 };
 }
+
+export type SessionAdmin = { kind: "admin"; id: number; username: string; role: "admin" | "viewer" };
+
+/** The signed-in admin or viewer (null: no cookie, expired or deactivated). `offline`: the backend did not answer. */
+export async function getAdminSession(): Promise<{ admin: SessionAdmin | null; offline: boolean }> {
+  const jar = await cookies();
+  if (!jar.get("s2d_admin")) return { admin: null, offline: false };
+  const { status, data } = await serverGet<SessionAdmin>("/auth/admin/me");
+  return { admin: data, offline: status === 0 || status >= 500 };
+}

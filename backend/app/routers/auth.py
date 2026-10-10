@@ -156,10 +156,13 @@ def driver_set_pin(body: DriverSetPin, request: Request, response: Response, db:
 
 @router.post("/admin/login")
 def admin_login(body: AdminLogin, request: Request, response: Response, db: Session = Depends(get_db)):
-    actor = f"admin:{body.username}"
+    # Usernames are matched without caring about letter case or spaces around them (Admin = admin),
+    # and the lockout counts them as one account.
+    name = body.username.strip().lower()
+    actor = f"admin:{name}"
     _check_not_locked(db, actor, "admin_login", "admin_login_failed")
 
-    user = db.scalar(select(AdminUser).where(AdminUser.username == body.username))
+    user = db.scalar(select(AdminUser).where(func.lower(AdminUser.username) == name))
     if user is None or user.status != RecordStatus.active:
         burn_time()
         _log(db, request, "admin_login_failed", actor, {"reason": "unknown or inactive"})

@@ -80,13 +80,11 @@ export function TripScreen({ initial }: { initial: ActiveTrip & { trip: Trip } }
     return () => clearTimeout(id);
   }, [confirmed]);
 
-  const goHome = useCallback(
-    (notice?: string) => {
-      router.replace(notice ? `/driver?notice=${notice}` : "/driver");
-      router.refresh();
-    },
-    [router],
-  );
+  // A full page load, not a client-side route change: the trip is over, the home page must load fresh, and a
+  // route change that stalls on a phone (seen on the LAN dev server) would leave "Done" doing nothing.
+  const goHome = useCallback((notice?: string) => {
+    window.location.replace(notice ? `/driver?notice=${notice}` : "/driver");
+  }, []);
 
   if (!client) {
     // the QR is kept in this tab's storage, which only exists in the browser: render after hydration

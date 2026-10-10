@@ -223,3 +223,25 @@
     transform: translateY(0);
   }
 }
+
+/* dashes moving along the road on the admin sign-in panel */
+.road-dash {
+  animation: road-dash 2.4s linear infinite;
+}
+@keyframes road-dash {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .road-dash {
+    animation: none;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}

@@ -65,8 +65,81 @@
     "note": "Tell us your shift rules (start time, end time, weekends, holidays) and we will plan this with you."
   },
   "dashboard": {
-    "greeting": "Good morning",
-    "skeletonNote": "Live numbers arrive in step 5. This is the layout."
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}"
+    },
+    "offline": "Connection lost · showing {time}",
+    "refresh": "Refresh now",
+    "overtimeHint": "Hours beyond the shift and monthly totals, in the next phase.",
+    "cards": {
+      "onTrip": "Cars on a trip now",
+      "available": "Cars free",
+      "waiting": "Waiting for a passenger to confirm",
+      "tripsToday": "Trips today",
+      "kmToday": "Driven today",
+      "alerts": "Open alerts"
+    },
+    "board": {
+      "title": "Cars right now",
+      "hint": "{count, plural, one {# car} other {# cars}}, live",
+      "filter": "Show cars",
+      "all": "All",
+      "none": "No cars here right now.",
+      "waitingStart": "start",
+      "waitingEnd": "end"
+    },
+    "live": {
+      "updated": "Live · {time}",
+      "title": "Trips running now",
+      "hint": "{count, plural, one {# open trip} other {# open trips}}",
+      "emptyTitle": "No trips running right now",
+      "emptyBody": "When a driver starts a trip it shows up here within a few seconds.",
+      "noPassenger": "No passenger",
+      "visitor": "Visitor",
+      "passengerNotYet": "Passenger not confirmed yet",
+      "officeCheck": "Office to check",
+      "since": "since {time}"
+    },
+    "tripStatus": {
+      "waiting_for_passenger": "Waiting for passenger",
+      "in_progress": "On trip",
+      "waiting_for_end_confirm": "Waiting for end",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "closed_by_admin": "Closed by office"
+    },
+    "alerts": {
+      "title": "Alerts",
+      "hint": "{count, plural, one {# open} other {# open}}",
+      "seeAll": "All alerts",
+      "emptyTitle": "All clear",
+      "emptyBody": "No open alerts. The checks run every minute.",
+      "type": {
+        "km_gap": "Km gap",
+        "long_trip": "Long trip",
+        "waiting_too_long": "Waiting too long",
+        "wrong_ids": "Wrong IDs",
+        "high_km": "High km",
+        "admin_closed": "Closed by office"
+      },
+      "solve": "Solve",
+      "noteLabel": "What was done? (optional)",
+      "notePlaceholder": "e.g. Called the driver, odometer photo checked",
+      "solveFailed": "Could not save. Try again.",
+      "markSolved": "Mark as solved"
+    },
+    "charts": {
+      "kmTitle": "Km per car this month",
+      "kmHint": "{km} km in total",
+      "noKm": "No finished trips this month yet.",
+      "tripsTitle": "Trips per day this month",
+      "tripsHint": "{count, plural, one {# trip} other {# trips}} so far",
+      "noTrips": "No trips this month yet.",
+      "tripsCount": "{count, plural, one {# trip} other {# trips}}",
+      "today": "Today"
+    }
   },
   "styleguide": {
     "title": "Style guide",
@@ -452,5 +525,38 @@
         "body": "Ask the driver to show the QR code again and scan it once more."
       }
     }
+  },
+  "adminAuth": {
+    "pageTitle": "Transport office sign in",
+    "eyebrow": "Transport office",
+    "hero": "Every company car, live, in one place.",
+    "point1": "See which car is where and who is driving",
+    "point2": "Check, approve and close trips",
+    "point3": "Reports for any day or month",
+    "title": "Sign in",
+    "lead": "Use the username and password the system admin gave you.",
+    "expired": "Your session has ended. Sign in again to carry on where you were.",
+    "username": "Username",
+    "password": "Password",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "signIn": "Sign in",
+    "welcome": "Welcome",
+    "sessionNote": "You stay signed in for 8 hours on this computer. Sign out when you leave a shared computer.",
+    "driverLink": "Are you a driver? Driver sign in",
+    "errWrong": "Username or password is not correct.",
+    "errLocked": "Too many wrong tries. Wait 15 minutes, or ask another admin to check your account.",
+    "errEmpty": "Type your username and password.",
+    "errNetwork": "No connection to the server. Check the network and try again.",
+    "errServer": "Something went wrong. Please try again.",
+    "offlineTitle": "Can't reach the server",
+    "offlineBody": "The backend is not answering. Check that it is running, then reload this page.",
+    "viewOnly": "View only",
+    "accountMenu": "Account menu for {name}",
+    "roleAdmin": "Admin",
+    "roleViewer": "Viewer",
+    "roleAdminHint": "Can change trips, cars, people and settings.",
+    "roleViewerHint": "Can look at everything, but not change it.",
+    "signOut": "Sign out"
   }
 }

@@ -87,6 +87,16 @@ def test_admin_locked_after_too_many_wrong_tries(client, db):
     assert r.status_code == 429
 
 
+def test_admin_username_ignores_letter_case_and_lockout_counts_it_once(client, db):
+    u = make_admin(db)
+    r = client.post("/api/auth/admin/login", json={"username": f"  {u.username.upper()} ", "password": "correct-horse"})
+    assert r.status_code == 200 and r.json()["user"]["username"] == u.username
+    # wrong tries with different letter cases all count toward the same lockout
+    for name in (u.username, u.username.upper(), u.username.title(), u.username, u.username.upper()):
+        assert client.post("/api/auth/admin/login", json={"username": name, "password": "bad"}).status_code == 401
+    assert client.post("/api/auth/admin/login", json={"username": u.username, "password": "correct-horse"}).status_code == 429
+
+
 def test_role_guard_admin_vs_viewer_vs_driver(db):
     guarded = FastAPI()
     guarded.dependency_overrides[get_db] = lambda: db
