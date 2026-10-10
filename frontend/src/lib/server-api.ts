@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 // Server-side calls (pages that check the session before showing anything). The browser's cookies are passed on.
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
-export async function serverGet<T>(path: string): Promise<{ status: number; data: T | null }> {
+/** `code`: the backend's error code (detail.code) when the call failed, for pages that explain why. */
+export async function serverGet<T>(path: string): Promise<{ status: number; data: T | null; code?: string }> {
   const jar = await cookies();
   const cookie = jar
     .getAll()
@@ -15,7 +16,9 @@ export async function serverGet<T>(path: string): Promise<{ status: number; data
       headers: { Accept: "application/json", ...(cookie ? { Cookie: cookie } : {}) },
       cache: "no-store",
     });
-    return { status: res.status, data: res.ok ? ((await res.json()) as T) : null };
+    if (res.ok) return { status: res.status, data: (await res.json()) as T };
+    const body = (await res.json().catch(() => null)) as { detail?: { code?: string } } | null;
+    return { status: res.status, data: null, code: typeof body?.detail?.code === "string" ? body.detail.code : undefined };
   } catch {
     return { status: 0, data: null }; // backend not running
   }

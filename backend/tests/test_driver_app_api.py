@@ -54,3 +54,14 @@ def test_active_trip_tells_the_app_what_it_may_show(client, db):
     body = client.get("/api/trips/active", headers=auth("driver", driver.id)).json()
     assert body["allow_cant_scan"] is False and body["qr_expiry_minutes"] == 12
     assert body["trip"]["status"] == "waiting_for_passenger"
+
+
+def test_passenger_page_knows_it_was_opened_by_the_driver(client, db):
+    from tests.test_end_trip import token_of
+    driver = make_driver(db)
+    raw = token_of(start(client, driver, make_car(db)).json()["start_qr"])
+    assert client.get(f"/api/p/{raw}").json()["opened_by_driver"] is False
+    assert client.get(f"/api/p/{raw}", headers=auth("driver", driver.id)).json()["opened_by_driver"] is True
+    other = make_driver(db)
+    assert client.get(f"/api/p/{raw}", headers=auth("driver", other.id)).json()["opened_by_driver"] is False
+

@@ -514,6 +514,44 @@ Frontend:
 Notes: QR codes, GPS and the screen staying on need https on phones; on the laptop `http://localhost` is fine. Free typing of places stays the
 main way to name them (there is no map service to turn GPS into a place name). The photo that is uploaded is the shrunk copy, not the phone's original file.
 
+### 2026-10-10 (frontend step 4: passenger pages)
+
+Backend (no database change):
+- [x] `GET /api/p/{token}` also says `opened_by_driver`: true when the link was opened on the trip driver's own signed-in phone, so the page
+      can tell straight away that the passenger has to scan with their own phone (confirming from there was already refused).
+- [x] 1 new test, 278 in total pass.
+
+Frontend:
+- [x] Passenger page `/p/{token}`, where the one-time QR on the driver's phone leads. No sign-in: the code is the key. Light frame with the
+      Epic logo, EN / বাং and light / dark like the rest of the app. The address holds the code, so the page is kept out of search engines
+      and does not pass its address on to other sites.
+- [x] Start QR: "Confirm you are in this car", the code's time left (amber in the last minute; at zero the page says the code expired),
+      a navy trip card (car, model, driver, time, from, to) and the dashboard photo full screen on tap.
+  - Epic employee: type the employee ID (letter case does not matter), "Next" shows **only the name** in a green card ("Is this you?"),
+    then "Yes, start the trip" or "Not me, change the ID". A wrong ID shakes the box and says how many tries are left.
+  - Visitor (when allowed in Settings): name, phone number, reason (optional). The phone is needed again at the end, the page says so.
+  - Done: a tick that draws itself, "You're all set, thank you {name}", the trip card, and what happens at the end of the trip.
+- [x] End QR: "Confirm the end of your trip", the trip card with "Ended" time, start and end dashboard photos, odometer rolling from the
+      start km to the end km, distance and time. Then the same employee ID (or the same phone number for a visitor); a different one says
+      it does not match and how many tries are left. Done: tick, odometer, distance and time, trip number, "You can close this page".
+- [x] When the code cannot be used, one clear notice with what to do: already used (green, nothing to do), expired (ask for "New QR"),
+      replaced by a newer code, trip cancelled, locked after wrong tries, too many tries, not a valid code, wrong step, server not reachable.
+      The same notice comes up if the code dies while the page is open (for example the driver cancels while the passenger is typing).
+- [x] Opened on the driver's own phone: the trip is shown with an amber note instead of the form.
+- [x] Km are shown in the same digits as the car's odometer (also in Bangla). All new texts in English and Bangla.
+- [x] Checked in the sandbox with Chromium at phone size: one browser as the driver and separate browsers as passengers, against the real
+      backend. Employee trip: driver's own phone note, start page, photo, wrong ID (4 tries left), name card, confirm, the driver's phone
+      moves on by itself, reload shows "already used", end page with both photos, another passenger's ID refused, confirm, both phones show
+      "Trip complete". Visitor trip in Bangla and dark: empty form marked, confirm, wrong phone refused, end confirmed. Old code after "New QR",
+      driver cancels while the passenger types, made-up code, backend stopped. No browser errors. Lint, types and production build pass.
+- [ ] To verify on the laptop and phones: "Testing on phones" with `npm run dev:lan:https` and `PUBLIC_BASE_URL` set to the laptop's https
+      address. Phone 1 signs in as a driver (EMP-1021 / 2580 from the seed) and starts a trip; phone 2 scans the Start QR with its normal
+      camera app, types EMP-2210 and confirms; drive; end on phone 1; phone 2 scans the End QR and confirms with EMP-2210 again.
+      Try a visitor trip too, and scanning the QR with phone 1 itself.
+
+Notes: the passenger only needs the phone's normal camera app (the QR is a normal link), no app to install. If the passenger's phone has no
+internet, the driver still has "Passenger can't scan". The page does not keep anything on the passenger's phone.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -559,13 +597,17 @@ completed trips locked except admin corrections with a reason; never delete cars
 .\.venv\Scripts\Activate.ps1
 pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler qrcode reportlab pillow openpyxl pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
-alembic upgrade head          # create/update tables
-python -m app.seed            # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
-pytest -q                     # database rule tests and sign-in tests
-uvicorn app.main:app --reload # API at http://localhost:8000, docs at /api/docs
-python -m app.worker          # second PowerShell window: background alert checks every minute (run only one)
+python -m alembic upgrade head   # create/update tables
+python -m app.seed               # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
+python -m pytest -q              # all backend tests
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000   # API at http://127.0.0.1:8000, docs at /api/docs
+python -m app.worker             # second PowerShell window: background alert checks every minute (run only one)
 pip freeze > requirements.txt
 ```
+
+All commands go through `python -m ...`. On the company laptop, Windows Application Control blocks `pytest.exe` (and can block the other
+`.exe` launchers that pip puts in `.venv\Scripts`); `python -m` runs the same thing through `python.exe`. Older log entries above still say
+`pytest -q` or `alembic upgrade head`, read them as `python -m pytest -q` and `python -m alembic upgrade head`.
 
 `backend/.env` values: `DATABASE_URL`, `SECRET_KEY` (generate with
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`), `ENVIRONMENT` (`development` or `production`;
@@ -576,8 +618,8 @@ production refuses to start with a weak key). Optional: `DRIVER_TOKEN_DAYS` (30)
 Change an admin password: `python -m app.set_password admin` (hidden prompt, 8-72 characters).
 Create a user: `python -m app.set_password mary --create --role viewer`.
 
-New migration after changing models: `alembic revision --autogenerate -m "message"`, then **review it**
-(autogenerate does not handle sequences, triggers or dropping enum types), and run `alembic check`.
+New migration after changing models: `python -m alembic revision --autogenerate -m "message"`, then **review it**
+(autogenerate does not handle sequences, triggers or dropping enum types), and run `python -m alembic check`.
 
 ## How to run the frontend (from `frontend/`, PowerShell)
 
@@ -600,7 +642,7 @@ npm run start:lan             # run the production build for phones (faster than
 1. Laptop and phones on the **same Wi-Fi**. In Windows, that Wi-Fi should be a **Private** network
    (Settings > Network & internet > Wi-Fi > the network > Private).
 2. Window 1, backend (stays on 127.0.0.1, Swagger at http://127.0.0.1:8000/api/docs):
-   `uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
+   `python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
 3. Window 2, frontend: `npm run dev:lan:https` (with https, needed for the camera scanner and GPS). It prints something like
    `On the phones: https://192.168.0.104:3000` and a QR code. `npm run dev:lan` is the same without https.
 4. The first time, Windows asks whether Node.js may use the network: tick **Private networks** and allow.
@@ -637,7 +679,7 @@ npm run start:lan             # run the production build for phones (faster than
 | POST | `/api/trips/{id}/cancel` | driver / admin | cancel before the passenger confirms (reason required) |
 | POST | `/api/trips/{id}/end` | driver | end the trip (multipart form + end photo); returns the End QR, or completes at once with no passenger |
 | POST | `/api/trips/{id}/end-qr` | driver | new End QR (old one stops working; `423` if locked) |
-| GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning a Start QR (trip details) or an End QR (summary) |
+| GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning a Start QR (trip details) or an End QR (summary); `opened_by_driver` when opened on the trip driver's own phone |
 | GET | `/api/p/{token}/photo` | anyone with the QR | start dashboard photo (only while the QR is valid) |
 | GET | `/api/p/{token}/photo/{kind}` | anyone with the QR | `start` or `end` dashboard photo |
 | POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR only; wrong IDs count toward the limit) |
@@ -704,7 +746,7 @@ Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 day
 README.md                  this file
 docs/                      the project plan PDF
 backend/
-  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval)
+  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -743,7 +785,7 @@ backend/
   tests/test_admin_users_settings.py users and settings pages
   tests/test_reports.py    reports, Excel/PDF, audit export, purposes
   tests/test_cookie_sessions.py cookies, CSRF header, sign-out, weak PINs, ID letter case
-  tests/test_driver_app_api.py car page without sticker version, last end place, own trip by id
+  tests/test_driver_app_api.py car page without sticker version, last end place, own trip by id, page opened on the driver's phone
   tests/test_admin_views.py dashboard, history, detail, photo links, audit
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
@@ -761,6 +803,9 @@ frontend/                  Next.js app
                            trip-views.tsx), photo and location fields, reason sheet, steps bar
   src/app/driver/trip/     the open trip from Start QR to summary
   src/lib/driver-api.ts    types and calls for the driver screens, QR kept per tab, sticker check; photo.ts shrinks photos
+  src/app/p/[token]/       passenger page (Start QR or End QR, or a notice when the code cannot be used)
+  src/components/passenger/ passenger frame, start flow (employee / visitor), end flow, shared pieces (trip card, code timer, photo viewer, notices)
+  src/lib/passenger-api.ts types and calls for the passenger pages
   src/lib/api.ts           browser calls to the API (errors, X-S2D header); server-api.ts for server-side checks
   public/brand/            Epic Group logo (cream and navy)
   scripts/dev-lan.mjs      starts the dev server for phones (http or https with its own certificate) and prints the address + QR code
@@ -768,9 +813,9 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (frontend step 3) on the laptop and phones, and commit.
-2. Frontend step 4: passenger pages (open the Start / End QR, Epic employee or visitor, confirm), so the whole trip can be done with phones only.
-3. Then steps 5-9 as listed in the frontend step 1 entry.
+1. Verify the unchecked items above (frontend step 4) with the laptop and two phones, a full trip with phones only, and commit.
+2. Frontend step 5: admin sign-in and the live dashboard.
+3. Then steps 6-9 as listed in the frontend step 1 entry.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 
 ## Conventions for whoever continues

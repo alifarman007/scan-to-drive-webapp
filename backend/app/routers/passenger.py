@@ -88,10 +88,14 @@ def _minutes(start: datetime | None, end: datetime | None) -> int | None:
 
 
 @router.get("/{token}")
-def open_qr(token: str, db: Session = Depends(get_db)):
-    """P1/S3 (Start QR) and P3/S6 (End QR): what the passenger sees after scanning."""
+def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = Depends(optional_driver_id)):
+    """P1/S3 (Start QR) and P3/S6 (End QR): what the passenger sees after scanning.
+
+    `opened_by_driver`: the page was opened on the trip driver's own signed-in phone, so it can say straight
+    away that the passenger must scan with their own phone (confirming from there is refused anyway)."""
     row, trip = resolve_token(db, token)
     left = tries_left(db, trip.id, row.kind)
+    opened_by_driver = driver_id is not None and driver_id == trip.driver_id
     common = {
         "trip_no": trip.trip_no,
         "car_code": trip.vehicle.car_code,
@@ -111,6 +115,7 @@ def open_qr(token: str, db: Session = Depends(get_db)):
             "expires_at": row.expires_at,
             "allow_visitors": bool(app_settings.get_int(db, "allow_visitors")),
             "tries_left": left,
+            "opened_by_driver": opened_by_driver,
         }
     return {
         "kind": "end",
@@ -127,6 +132,7 @@ def open_qr(token: str, db: Session = Depends(get_db)):
         "confirm_as": "visitor" if trip.is_visitor else "employee",  # which box the page shows
         "expires_at": row.expires_at,
         "tries_left": left,
+        "opened_by_driver": opened_by_driver,
     }
 
 

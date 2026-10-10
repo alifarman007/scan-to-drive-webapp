@@ -336,5 +336,121 @@
     "backHome": "Back to my page",
     "passengerConfirmed": "Passenger confirmed",
     "haveAGoodTrip": "Have a good trip. Drive safely."
+  },
+  "passenger": {
+    "pageTitle": "Confirm your trip",
+    "driver": "Driver",
+    "time": "Time",
+    "ended": "Ended",
+    "from": "From",
+    "to": "To",
+    "validFor": "Code valid for",
+    "startEyebrow": "Company car trip",
+    "startTitle": "Confirm you are in this car",
+    "seePhoto": "Dashboard photo",
+    "startPhotoAlt": "Dashboard photo at the start of the trip",
+    "closePhoto": "Close",
+    "driversPhone": "This is the driver's own phone. The passenger has to scan the QR code with their own phone.",
+    "whoAreYou": "Who are you?",
+    "employee": "Epic employee",
+    "visitor": "Visitor",
+    "yourId": "Your employee ID",
+    "idHint": "As on your ID card, for example EMP-1234.",
+    "triesLeft": "{left, plural, one {# try left} other {# tries left}}",
+    "next": "Next",
+    "isThisYou": "Is this you?",
+    "confirmStart": "Yes, start the trip",
+    "notMe": "Not me, change the ID",
+    "visitorName": "Your name",
+    "visitorNamePlaceholder": "Full name",
+    "nameNeeded": "Please type your name.",
+    "visitorPhone": "Your phone number",
+    "phoneNeeded": "Please type a valid phone number.",
+    "phoneHint": "You will type the same number again at the end of the trip.",
+    "visitorReason": "Reason for the trip (optional)",
+    "visitorReasonPlaceholder": "For example: factory visit",
+    "startDoneTitle": "You're all set",
+    "startDoneBody": "Thank you, {name}. Your trip has started.",
+    "atTheEnd": "When you arrive, the driver will show you another QR code. Scan it and type the same employee ID to confirm the end of the trip.",
+    "atTheEndVisitor": "When you arrive, the driver will show you another QR code. Scan it and type the same phone number to confirm the end of the trip.",
+    "startedAt": "Started {time}",
+    "canClose": "You can close this page.",
+    "endEyebrow": "End of trip",
+    "endTitle": "Confirm the end of your trip",
+    "startPhoto": "Start photo",
+    "endPhoto": "End photo",
+    "endPhotoAlt": "Dashboard photo at the end of the trip",
+    "odometer": "Odometer",
+    "startedAtKm": "Started at {km} km",
+    "distance": "Distance",
+    "journeyTime": "Time",
+    "endIdHint": "The same ID you typed at the start.",
+    "endPhoneLabel": "Your phone number",
+    "endPhoneHint": "The same number you gave at the start.",
+    "confirmEnd": "Confirm end of trip",
+    "endDoneTitle": "Trip complete",
+    "endDoneBody": "Thank you for confirming. Have a good day.",
+    "endedAt": "Ended {time}",
+    "errors": {
+      "generic": "Something went wrong. Please try again.",
+      "network": "No connection. Check Wi-Fi or mobile data and try again.",
+      "idNotFound": "We could not find this employee ID. Check it and try again.",
+      "idNotFoundLeft": "We could not find this employee ID. {left, plural, one {# try left} other {# tries left}}.",
+      "mismatch": "This ID does not match the passenger who started the trip.",
+      "mismatchLeft": "This ID does not match the passenger who started the trip. {left, plural, one {# try left} other {# tries left}}.",
+      "phoneMismatch": "This number does not match the one given at the start.",
+      "phoneMismatchLeft": "This number does not match the one given at the start. {left, plural, one {# try left} other {# tries left}}.",
+      "DRIVER_CANNOT_CONFIRM": "This is the driver's own phone. Please scan with your own phone.",
+      "PASSENGER_IS_DRIVER": "This is the driver's ID. Please type your own employee ID.",
+      "VISITORS_NOT_ALLOWED": "Visitors cannot be confirmed here. Please ask the transport office.",
+      "WRONG_PASSENGER_TYPE": "This trip was started by a different kind of passenger. Ask the driver to check.",
+      "checkFields": "Please check what you typed."
+    },
+    "dead": {
+      "QR_INVALID": {
+        "title": "This code is not valid",
+        "body": "The link may be incomplete. Ask the driver to show the QR code again and scan it with your phone camera."
+      },
+      "WRONG_QR": {
+        "title": "Wrong code for this step",
+        "body": "This code is for a different step of the trip. Ask the driver for the right QR code."
+      },
+      "QR_USED": {
+        "title": "This code has already been used",
+        "body": "The trip was already confirmed with this code. Nothing more to do, you can close this page."
+      },
+      "TRIP_CANCELLED": {
+        "title": "This trip was cancelled",
+        "body": "The driver cancelled this trip, so there is nothing to confirm. You can close this page."
+      },
+      "QR_BLOCKED": {
+        "title": "This code is locked",
+        "body": "There were too many wrong tries. Ask the driver to contact the transport office."
+      },
+      "QR_REPLACED": {
+        "title": "The driver made a new code",
+        "body": "This code was replaced by a newer one. Scan the new QR code on the driver's phone."
+      },
+      "QR_EXPIRED": {
+        "title": "This code has expired",
+        "body": "Codes only last a few minutes. Ask the driver to tap \"New QR\" and scan again."
+      },
+      "TRIP_NOT_WAITING": {
+        "title": "This trip is not waiting for you",
+        "body": "The trip has moved on (it may already be confirmed or closed). You can close this page."
+      },
+      "TOO_MANY_LOOKUPS": {
+        "title": "Too many tries",
+        "body": "Please wait a few minutes before trying again, or ask the driver to contact the transport office."
+      },
+      "OFFLINE": {
+        "title": "Can't reach the server",
+        "body": "Check your internet connection and open the link again."
+      },
+      "OTHER": {
+        "title": "Something went wrong",
+        "body": "Ask the driver to show the QR code again and scan it once more."
+      }
+    }
   }
 }
