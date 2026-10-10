@@ -29,7 +29,7 @@ export function StatCards({ cards }: { cards: Dashboard["cards"] }) {
     { key: "onTrip", value: cards.cars_on_trip, icon: CarProfileIcon, tone: "trip", live: cards.cars_on_trip > 0 },
     { key: "available", value: cards.cars_available, icon: CarIcon, tone: "ok" },
     { key: "waiting", value: cards.trips_waiting_confirm, icon: HourglassMediumIcon, tone: cards.trips_waiting_confirm ? "wait" : "plain" },
-    { key: "tripsToday", value: cards.trips_today, icon: PathIcon, tone: "plain" },
+    { key: "tripsToday", value: cards.trips_today, icon: PathIcon, tone: "plain", href: "/admin/trips?range=today" },
     { key: "kmToday", value: cards.km_today, icon: RoadHorizonIcon, tone: "plain", unit: "km" },
     { key: "alerts", value: cards.open_alerts, icon: BellRingingIcon, tone: cards.open_alerts ? "bad" : "plain", href: "/admin/alerts" },
   ];

@@ -6,5 +6,5 @@ export type NavKey =
 
 /** Which build step each admin page arrives in (shown on the placeholder pages until then). */
 export const PAGE_STEP: Partial<Record<NavKey, number>> = {
-  trips: 6, cars: 7, drivers: 7, passengers: 7, alerts: 7, audit: 7, reports: 8, users: 8, settings: 8,
+  cars: 7, drivers: 7, passengers: 7, alerts: 7, audit: 7, reports: 8, users: 8, settings: 8,
 };

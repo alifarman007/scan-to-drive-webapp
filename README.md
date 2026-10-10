@@ -618,6 +618,50 @@ Frontend:
       phones show "Trip complete". The step 4 passenger checks were run again. No browser errors.
 - [ ] To verify on the phones: start a trip, press "Passenger can't scan", drive, end, scan the End QR on the passenger phone and type the ID.
 
+### 2026-10-10 (frontend step 6: trip history and trip detail)
+
+Backend (no database change):
+- [x] Trip detail (`GET /api/admin/trips/{id}`) also returns `lock` (for a trip waiting at a QR: which QR, blocked or not, tries left),
+      `approved_by_name`, and for each timeline step `who` (driver, passenger, visitor, office or automatic, with the person's name), so the
+      page can say "Rahim Uddin · driver" instead of "driver:EMP-1021".
+- [x] 2 new tests, 285 in total pass.
+
+Frontend:
+- [x] Trip history `/admin/trips`:
+  - One filter bar: search (trip no., car, driver, passenger, visitor, places, purpose; searches by itself after a short pause, Esc clears),
+    dates (All time, Today, This week, This month, Pick dates), status, car, driver, department, and two quick buttons: "Needs approval"
+    (with the count) and "Office to check". "Clear filters" when anything is set.
+  - All filters are in the address (`/admin/trips?q=nadia&range=week&status=completed&page=2`), so back, reload and shared links keep them.
+  - Laptops: one line per trip (trip no. and time, car, driver, passenger or purpose, where it went and where from, km and time, status with
+    "Needs approval" / "Office to check" under it). Phones: a small card per trip. The whole row opens the trip.
+  - Total trips and km for the filters at the top, 25 per page with previous / next, a thin loading bar while the next results come.
+    Empty results say so, with a button to clear the filters.
+  - The search box in the top bar now searches trips (Ctrl+K jumps to it from any admin page).
+- [x] Trip detail `/admin/trips/{id}`:
+  - Header: trip number, status, date, car and registration. Notices at the top only when something needs attention: QR blocked by wrong IDs,
+    waiting for approval (with the driver's reason for each skipped step), approved / rejected (note, by whom, when), closed by the office or
+    cancelled (with the reason), visitor trip.
+  - "Check the meter": start and end dashboard photos side by side, the km the driver typed under each (odometer tiles), the distance in between,
+    places, times and a Map link when GPS was saved. Click a photo to see it big; click again to zoom in where you point (the zoomed part follows
+    the mouse), with the typed km in the corner to compare. Photo links last 10 minutes; if one has run out, the page gets fresh links by itself.
+  - People (driver with phone button, passenger with ID and department, or visitor with phone and reason, or "no passenger" with the purpose),
+    Journey (driver started, passenger confirmed start, driver ended, passenger confirmed end, "Could not scan" where skipped, distance, time),
+    the trip's alerts.
+  - Timeline of every step with who did it and the time to the second; wrong IDs, blocks, cancel and reject in red. The small phone button on a step
+    shows the device, IP address and GPS of that step.
+  - Admin buttons, only when they fit the trip: Approve / Reject (pending approval; reject needs a note), Unlock (QR blocked), Close trip (open trip;
+    quick reasons, end km box when the trip has none, checked against the start km). Each asks in a dialog (a sheet from the bottom on phones),
+    then the page updates and says what was done. Viewers see no buttons.
+  - Unknown trip: "Trip not found" with a link back.
+- [x] Dashboard: car bays with a trip, rows of "Trips running now" and trip numbers in alerts open the trip. "Trips today" opens today's history.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox (laptop 1440 px and phone 390 px, no sideways scrolling on phones): top-bar search, search + week + status, clear,
+      needs approval, empty date range, page 2, approve with a note, photo zoom, device details, a blocked trip opened from the dashboard and
+      unlocked, closing a trip (end km lower than start refused, then closed without km), Bangla and dark, unknown trip, viewer without buttons.
+      No browser errors. Lint, types and production build pass.
+- [ ] To verify on the laptop: open Trip history, try the filters and the top-bar search; open a trip and zoom into a photo. Make a trip with
+      "Passenger can't scan" and approve it; block a Start QR with 5 wrong IDs on a phone and unlock it; close a trip that is still running.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -874,6 +918,9 @@ frontend/                  Next.js app
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
   src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), trips running now, two charts
+  src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail
+  src/components/admin/trips/ history list and filter bar, detail page, meter check with photo zoom, timeline, admin action dialogs
+  src/lib/trip-filters.ts  reads and writes the trip history filters in the address
   src/lib/admin-api.ts     types and calls for the admin pages, back to sign-in when the session ends
   src/components/passenger/ passenger frame, start flow (employee / visitor), end flow, shared pieces (trip card, code timer, photo viewer, notices)
   src/lib/passenger-api.ts types and calls for the passenger pages
@@ -884,9 +931,9 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (frontend step 5) on the laptop, with a phone making trips, and commit.
-2. Frontend step 6: trip history (filters, search) and trip detail (photos, timeline, close / unlock / approve).
-3. Then steps 7-9 as listed in the frontend step 1 entry.
+1. Verify the unchecked items above (frontend step 6) on the laptop, and commit.
+2. Frontend step 7: admin lists (cars and QR stickers, drivers, passengers and Excel import, alerts, audit log).
+3. Then steps 8-9 as listed in the frontend step 1 entry.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 
 ## Conventions for whoever continues

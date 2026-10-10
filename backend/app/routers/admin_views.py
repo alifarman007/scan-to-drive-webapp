@@ -18,6 +18,7 @@ from app.routers.admin_alerts import alert_out
 from app.routers.passenger import _send_photo
 from app.schemas import trip_out
 from app.security import photo_link_valid, sign_photo_link
+from app.services.qr_access import is_locked, tries_left
 from app.services.timeutil import SQL_TZ, day_start_utc, preset_range, range_bounds, today_local
 from app.storage import PhotoStorage, get_storage
 
@@ -59,6 +60,35 @@ def _live_trip(t: Trip, now: datetime) -> dict:
         minutes_running=_minutes_since(t.start_time, now),
     )
     return row
+
+
+def _who(db: Session, events: list[TripEvent]) -> dict[str, dict]:
+    """Audit actors ("driver:EMP-1021", "passenger:EMP-2210", "admin:mary", "visitor:017...", "system") with a
+    readable name, so the timeline says who did each step. One query per kind of person."""
+    ids = {"driver": set(), "passenger": set()}
+    for e in events:
+        kind, _, ref = e.actor.partition(":")
+        if kind in ids and ref and ref != "unknown":
+            ids[kind].add(ref.upper())
+    names = {}
+    if ids["driver"]:
+        names.update({f"driver:{k}": v for k, v in db.execute(
+            select(func.upper(Driver.employee_id), Driver.name).where(func.upper(Driver.employee_id).in_(ids["driver"]))).all()})
+    if ids["passenger"]:
+        names.update({f"passenger:{k}": v for k, v in db.execute(
+            select(func.upper(Passenger.employee_id), Passenger.name).where(func.upper(Passenger.employee_id).in_(ids["passenger"]))).all()})
+    out = {}
+    for e in events:
+        kind, _, ref = e.actor.partition(":")
+        if kind == "admin":
+            name = ref
+        elif kind == "visitor":
+            name = None  # the visitor's name is on the trip; the actor only holds the phone
+        else:
+            name = names.get(f"{kind}:{ref.upper()}")
+        out[e.actor] = {"kind": kind if kind in ("driver", "passenger", "visitor", "admin") else "system",
+                        "ref": None if ref in ("", "unknown") else ref, "name": name}
+    return out
 
 
 # ---- dashboard ---------------------------------------------------------------------------------
@@ -233,6 +263,12 @@ def trip_detail(
     row = _live_trip(t, now)
     if t.status not in OPEN_TRIP_STATUSES:
         row["minutes_running"] = None
+    # blocked by wrong IDs: the page offers "Unlock" (only while the trip waits for a passenger confirmation)
+    stage = {TripStatus.waiting_for_passenger: TripStage.start, TripStatus.waiting_for_end_confirm: TripStage.end}.get(t.status)
+    lock = None if stage is None else {
+        "stage": stage.value, "locked": is_locked(db, t.id, stage), "tries_left": tries_left(db, t.id, stage)}
+    approver = db.get(AdminUser, t.approved_by) if t.approved_by else None
+    who = _who(db, events)
     row.update(
         driver={"id": t.driver.id, "employee_id": t.driver.employee_id, "name": t.driver.name, "phone": t.driver.phone},
         passenger=None if t.passenger is None else {
@@ -247,12 +283,14 @@ def trip_detail(
         },
         photos=photos,
         approved_by=t.approved_by,
+        approved_by_name=approver.username if approver else None,
+        lock=lock,
     )
     return {
         "trip": row,
         "timeline": [{
             "id": e.id, "at": e.created_at, "event": e.event, "label": EVENT_LABELS.get(e.event, e.event),
-            "actor": e.actor, "ip": e.ip, "device": e.device,
+            "actor": e.actor, "who": who[e.actor], "ip": e.ip, "device": e.device,
             "lat": None if e.lat is None else float(e.lat), "lng": None if e.lng is None else float(e.lng),
             "detail": e.detail,
         } for e in events],

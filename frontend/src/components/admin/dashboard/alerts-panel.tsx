@@ -108,7 +108,15 @@ function AlertRow({ alert, asOf, onSolved }: { alert: Alert; asOf: string; onSol
         </div>
         <p className="text-sm leading-snug text-muted">{alert.message}</p>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-xs text-muted">{[alert.car_code, alert.trip_no].filter(Boolean).join(" · ")}</span>
+          <span className="font-mono text-xs text-muted">
+            {alert.car_code}
+            {alert.car_code && alert.trip_no ? " · " : null}
+            {alert.trip_no && alert.trip_id ? (
+              <Link href={`/admin/trips/${alert.trip_id}`} className="text-accent hover:underline">
+                {alert.trip_no}
+              </Link>
+            ) : null}
+          </span>
           {user.role === "admin" ? <SolveButton alert={alert} onSolved={onSolved} /> : null}
         </div>
       </div>

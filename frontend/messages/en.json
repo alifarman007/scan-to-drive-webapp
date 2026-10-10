@@ -15,7 +15,8 @@
     "comingSoon": "Coming soon",
     "phase2": "Phase 2",
     "km": "km",
-    "backHome": "Back to start"
+    "backHome": "Back to start",
+    "close": "Close"
   },
   "home": {
     "eyebrow": "Scan-to-Drive · Epic Group",
@@ -563,5 +564,237 @@
     "roleAdminHint": "Can change trips, cars, people and settings.",
     "roleViewerHint": "Can look at everything, but not change it.",
     "signOut": "Sign out"
+  },
+  "trips": {
+    "title": "Trip history",
+    "summary": "{count, plural, =0 {No trips} one {# trip} other {# trips}} · {km} km",
+    "searchLabel": "Search trips",
+    "searchHint": "Trip no., car, driver, passenger, place…",
+    "clearSearch": "Clear search",
+    "range": {
+      "label": "Dates",
+      "all": "All time",
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "custom": "Pick dates",
+      "from": "From date",
+      "to": "To date"
+    },
+    "filter": {
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "car": "Car",
+      "allCars": "All cars",
+      "driver": "Driver",
+      "allDrivers": "All drivers",
+      "department": "Department",
+      "allDepartments": "All departments",
+      "needsApproval": "Needs approval",
+      "officeCheck": "Office to check",
+      "clear": "Clear filters"
+    },
+    "columns": {
+      "trip": "Trip",
+      "car": "Car",
+      "driver": "Driver",
+      "passenger": "Passenger",
+      "route": "Going to",
+      "km": "Km",
+      "status": "Status"
+    },
+    "noPassenger": "No passenger",
+    "passengerUnknown": "Not confirmed",
+    "visitor": "Visitor",
+    "flags": {
+      "approval": "Needs approval",
+      "check": "Office to check"
+    },
+    "pages": {
+      "label": "Pages",
+      "showing": "{from}–{to} of {total}",
+      "of": "Page {page} of {pages}",
+      "previous": "Previous page",
+      "next": "Next page"
+    },
+    "empty": {
+      "title": "No trips yet",
+      "body": "Trips appear here as soon as a driver starts one.",
+      "filteredTitle": "No trips match these filters",
+      "filteredBody": "Try fewer filters or another date range.",
+      "clear": "Clear filters"
+    },
+    "fromPlace": "from {place}"
+  },
+  "tripDetail": {
+    "back": "Trip history",
+    "subtitle": "{date} · {car} {model} · {reg}",
+    "notFoundTitle": "Trip not found",
+    "notFoundBody": "This trip does not exist. It may be a wrong link.",
+    "alertsTitle": "Alerts on this trip",
+    "alertOpen": "Open",
+    "alertSolved": "Solved",
+    "alertSolvedNote": "Solved: {note}",
+    "done": {
+      "closed": "Trip closed. The car and the driver are free again.",
+      "unlocked": "Unlocked. The driver can make a new QR now.",
+      "approved": "Trip approved.",
+      "rejected": "Trip rejected. It stays in the history with your note."
+    },
+    "notice": {
+      "locked": {
+        "start": "The Start QR is blocked after too many wrong IDs",
+        "end": "The End QR is blocked after too many wrong IDs"
+      },
+      "lockedBody": "Unlock it to give the passenger new tries (the driver makes a new QR), or close the trip.",
+      "approval": {
+        "pending": "Waiting for your approval",
+        "approved": "Approved",
+        "rejected": "Rejected"
+      },
+      "skippedStart": "Start: the passenger could not scan. Driver's reason: {reason}",
+      "skippedEnd": "End: the passenger could not scan. Driver's reason: {reason}",
+      "approvalNote": "Note: {note}",
+      "decidedBy": "By {name}, {time}",
+      "closed": "Closed by the office",
+      "cancelled": "Cancelled by the driver",
+      "review": "Marked for the office to look at",
+      "reviewVisitor": "A visitor travelled on this trip."
+    },
+    "meter": {
+      "title": "Check the meter",
+      "hint": "The km the driver typed, next to the dashboard photos. Click a photo to zoom in.",
+      "start": "Start",
+      "end": "End",
+      "startAlt": "Dashboard photo at the start",
+      "endAlt": "Dashboard photo at the end",
+      "notEnded": "Not ended yet",
+      "noPhoto": "No photo",
+      "typed": "Driver typed",
+      "typedShort": "typed",
+      "map": "Map",
+      "enlarge": "Zoom",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "closePhoto": "Close photo",
+      "zoomHint": "Click the photo to zoom in where you point.",
+      "zoomedHint": "Move the mouse to look around. Click again to zoom out.",
+      "neverEnded": "The driver never ended this trip"
+    },
+    "people": {
+      "title": "People",
+      "driver": "Driver",
+      "employee": "Passenger · Epic employee",
+      "visitor": "Passenger · visitor",
+      "passenger": "Passenger",
+      "unknownPassenger": "Did not confirm",
+      "noPassenger": "No passenger",
+      "purpose": "Purpose: {purpose}",
+      "visitorReason": "Reason: {reason}"
+    },
+    "journey": {
+      "title": "Journey",
+      "started": "Driver started",
+      "passengerStart": "Passenger confirmed start",
+      "ended": "Driver ended",
+      "passengerEnd": "Passenger confirmed end",
+      "notConfirmed": "Could not scan",
+      "waiting": "Waiting",
+      "notYet": "Not yet",
+      "distance": "Distance",
+      "duration": "Time"
+    },
+    "actions": {
+      "approve": "Approve",
+      "reject": "Reject",
+      "unlock": "Unlock",
+      "close": "Close trip",
+      "cancel": "Cancel",
+      "closeTitle": "Close {trip}?",
+      "closeBody": "The trip ends now, its QR codes stop working, and the car and driver are free again. It is marked for review.",
+      "unlockTitle": "Unlock {trip}?",
+      "unlockBody": "The passenger gets new tries. The driver then makes a new QR on the phone.",
+      "approveTitle": "Approve {trip}?",
+      "approveBody": "The passenger could not confirm a step. Approve if the trip is right.",
+      "rejectTitle": "Reject {trip}?",
+      "rejectBody": "The trip stays in the history, marked as rejected, with your note.",
+      "reason": "Reason",
+      "reasonPlaceholder": "What happened?",
+      "noteOptional": "Note (optional)",
+      "noteRequired": "Why is it rejected?",
+      "approvePlaceholder": "e.g. Checked with the passenger by phone",
+      "rejectPlaceholder": "e.g. The passenger says they were not in the car",
+      "endKm": "End km (if you know it)",
+      "endKmHint": "Leave empty if unknown. Must be more than the start km ({km}).",
+      "quick": {
+        "forgot": "Driver forgot to end the trip",
+        "phone": "Driver's phone problem",
+        "mistake": "Started by mistake",
+        "typo": "Passenger mistyped the ID",
+        "checked": "Checked the passenger's ID card"
+      },
+      "errors": {
+        "generic": "Could not save. Try again.",
+        "network": "No connection to the server. Try again.",
+        "forbidden": "Only admins can do this.",
+        "REASON_REQUIRED": "Please give a reason.",
+        "NOTE_REQUIRED": "Please write why.",
+        "END_KM_TOO_LOW": "The end km must be more than the start km ({km}).",
+        "END_KM_ALREADY_SET": "This trip already has an end km. Leave the box empty.",
+        "TRIP_NOT_OPEN": "This trip has already finished. Reload the page.",
+        "NOT_LOCKED": "This trip is not blocked any more. Reload the page.",
+        "NO_PENDING_APPROVAL": "Someone has already decided this trip. Reload the page."
+      }
+    },
+    "timeline": {
+      "title": "Timeline",
+      "count": "{count, plural, one {# step} other {# steps}}",
+      "deviceToggle": "Device and location",
+      "device": "Device",
+      "ip": "IP address",
+      "gps": "GPS",
+      "who": {
+        "driver": "{name} · driver",
+        "passenger": "{name} · passenger",
+        "passengerUnknown": "Passenger's phone",
+        "visitor": "{name} · visitor",
+        "admin": "{name} · office",
+        "system": "Automatic"
+      },
+      "stage": {
+        "start": "Start QR",
+        "end": "End QR"
+      },
+      "note": {
+        "startKm": "Start km {km}",
+        "endKm": "End km {km} · {distance} km driven",
+        "endKmOnly": "End km {km}",
+        "typed": "Typed {id} (wrong try {n})",
+        "reason": "Reason: {text}",
+        "note": "Note: {text}",
+        "stage": "{stage}",
+        "identifiedAtEnd": "Said who they are at the end (the start was not confirmed)",
+        "visitor": "Visitor: {name}"
+      },
+      "events": {
+        "trip_started": "Trip started",
+        "trip_started_unconfirmed": "Started without passenger scan",
+        "journey_started": "Passenger confirmed the start",
+        "trip_end_submitted": "Driver ended the trip",
+        "trip_completed": "Trip completed",
+        "trip_completed_unconfirmed": "Completed without passenger scan",
+        "trip_cancelled": "Trip cancelled",
+        "trip_closed_by_admin": "Closed by the office",
+        "trip_unlocked": "QR unlocked",
+        "trip_approved": "Trip approved",
+        "trip_rejected": "Trip rejected",
+        "start_qr_renewed": "New Start QR",
+        "end_qr_renewed": "New End QR",
+        "passenger_lookup": "Passenger checked an ID",
+        "passenger_wrong_id": "Wrong ID typed",
+        "qr_blocked": "QR blocked",
+        "alert_solved": "Alert solved"
+      }
+    }
   }
 }

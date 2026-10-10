@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.models import AdminRole, Passenger, Trip, Vehicle, VehicleStatus
 from app.security import photo_link_valid, sign_photo_link
 from tests.test_admin_trips import close, hdr, make_admin
-from tests.test_cant_scan import cant_scan
+from tests.test_cant_scan import cant_scan, waiting_trip
 from tests.test_end_trip import (  # noqa: F401  (client fixture comes from there)
     END_JPEG, client, confirm_end, end, make_passenger, running_trip, token_of,
 )
@@ -250,6 +250,41 @@ def test_detail_of_a_finished_trip_includes_admin_close_and_alerts(client, db):
     assert body["trip"]["status"] == "closed_by_admin" and body["trip"]["minutes_running"] is None
     assert "trip_closed_by_admin" in [e["event"] for e in body["timeline"]]
     assert [a["type"] for a in body["alerts"]] == ["admin_closed"]
+
+
+def test_detail_names_who_did_each_step_and_shows_the_lock(client, db):
+    admin = make_admin(db)
+    car, driver = make_car(db), make_driver(db)
+    p = make_passenger(db, name="Faruk Ahmed")
+    body = start(client, driver, car).json()
+    t, raw = body["trip"]["id"], token_of(body["start_qr"])
+    lock = get(client, admin, f"/trips/{t}").json()["trip"]["lock"]
+    assert lock == {"stage": "start", "locked": False, "tries_left": 5}
+    for _ in range(5):
+        client.post(f"/api/p/{raw}/lookup", json={"employee_id": "EMP-NOPE"})
+    detail = get(client, admin, f"/trips/{t}").json()
+    assert detail["trip"]["lock"] == {"stage": "start", "locked": True, "tries_left": 0}
+    who = {e["event"]: e["who"] for e in detail["timeline"]}
+    assert who["trip_started"] == {"kind": "driver", "ref": driver.employee_id, "name": driver.name}
+    assert who["passenger_wrong_id"] == {"kind": "passenger", "ref": None, "name": None}
+    assert who["qr_blocked"]["kind"] == "system"
+    # unlock, confirm, and the passenger's name shows up too
+    client.post(f"/api/admin/trips/{t}/unlock", json={"reason": "typo"}, headers=hdr(admin))
+    new_raw = token_of(client.post(f"/api/trips/{t}/start-qr", headers=auth("driver", driver.id)).json()["start_qr"])
+    client.post(f"/api/p/{new_raw}/confirm-start", json={"passenger_type": "employee", "employee_id": p.employee_id})
+    detail = get(client, admin, f"/trips/{t}").json()
+    who = {e["event"]: e["who"] for e in detail["timeline"]}
+    assert who["journey_started"]["name"] == "Faruk Ahmed" and who["trip_unlocked"] == {"kind": "admin", "ref": admin.username, "name": admin.username}
+    assert detail["trip"]["lock"] is None  # in progress: nothing to unlock
+
+
+def test_detail_says_who_approved(client, db):
+    admin = make_admin(db)
+    driver, _, t, _ = waiting_trip(client, db)
+    cant_scan(client, driver, t)
+    client.post(f"/api/admin/trips/{t}/approval", json={"decision": "approved"}, headers=hdr(admin))
+    trip = get(client, admin, f"/trips/{t}").json()["trip"]
+    assert trip["approval_status"] == "approved" and trip["approved_by_name"] == admin.username
 
 
 def test_detail_unknown_trip(client, db):

@@ -4,9 +4,9 @@ import { CaretDownIcon, CircleNotchIcon, EyeIcon, ListIcon, MagnifyingGlassIcon,
 import { AnimatePresence, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Dialog, DropdownMenu } from "radix-ui";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 import { Wordmark } from "@/components/brand";
 import { LanguageSwitch } from "@/components/ui/language-switch";
@@ -155,20 +155,51 @@ function NavLink({ item, group, onNavigate }: { item: NavItem; group: string; on
 function TopBar({ user }: { user: AdminUser }) {
   const t = useTranslations("common");
   const ta = useTranslations("adminAuth");
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+
+  // Ctrl+K (or Cmd+K) jumps to the search box from anywhere in the admin pages
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        input.current?.focus();
+        input.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="flex flex-wrap items-center gap-3 px-gutter py-4">
-      <label className="flex h-11 min-w-0 flex-1 basis-64 items-center gap-2.5 rounded-control border border-border bg-card px-3.5 transition-[border-color,box-shadow] focus-within:border-ring focus-within:shadow-[0_0_0_4px_var(--ring-soft)] sm:max-w-md">
+      <form
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const q = input.current?.value.trim() ?? "";
+          router.push(q ? `/admin/trips?q=${encodeURIComponent(q)}` : "/admin/trips");
+          input.current?.blur();
+        }}
+        className="flex h-11 min-w-0 flex-1 basis-64 items-center gap-2.5 rounded-control border border-border bg-card px-3.5 transition-[border-color,box-shadow] focus-within:border-ring focus-within:shadow-[0_0_0_4px_var(--ring-soft)] sm:max-w-md"
+      >
         <MagnifyingGlassIcon size={18} className="shrink-0 text-muted" />
-        <span className="sr-only">{t("search")}</span>
+        <label htmlFor="top-search" className="sr-only">
+          {t("search")}
+        </label>
         <input
+          ref={input}
+          id="top-search"
           type="search"
+          name="q"
+          autoComplete="off"
           placeholder={t("searchHint")}
-          className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted"
+          className="min-w-0 flex-1 bg-transparent text-sm text-text outline-none placeholder:text-muted [&::-webkit-search-cancel-button]:hidden"
         />
         <kbd className="hidden rounded-md border border-border px-1.5 py-0.5 font-mono text-[0.7rem] text-muted sm:inline">
           Ctrl K
         </kbd>
-      </label>
+      </form>
       <div className="ml-auto flex items-center gap-2">
         {user.role === "viewer" ? (
           <span className="hidden items-center gap-1.5 rounded-full bg-soft px-3 py-1.5 text-xs font-bold text-title sm:inline-flex">

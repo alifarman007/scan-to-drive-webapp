@@ -3,6 +3,7 @@
 import { ArrowRightIcon, CarSimpleIcon, FlagIcon, IdentificationBadgeIcon, UserIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
+import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
 import { StatusChip } from "@/components/ui/status-chip";
@@ -72,7 +73,10 @@ function Row({ trip, asOf }: { trip: LiveTrip; asOf: string }) {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 py-3 md:grid-cols-[7.5rem_minmax(0,1.1fr)_minmax(0,1.3fr)_11rem_6.5rem]">
+    <Link
+      href={`/admin/trips/${trip.id}`}
+      className="-mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1.5 rounded-xl px-2 py-3 transition-colors hover:bg-bay/70 focus-visible:bg-ring-soft md:grid-cols-[7.5rem_minmax(0,1.1fr)_minmax(0,1.3fr)_11rem_6.5rem]"
+    >
       <div className="flex flex-col">
         <span className="font-display font-bold text-title">{trip.car_code}</span>
         <span className="font-mono text-xs text-muted">{trip.trip_no}</span>
@@ -96,6 +100,6 @@ function Row({ trip, asOf }: { trip: LiveTrip; asOf: string }) {
         <span className="font-mono font-semibold text-title tabular-nums">{duration(secondsSince(trip.start_time, now))}</span>
         <span className="text-xs text-muted">{t("live.since", { time: format.dateTime(new Date(trip.start_time), { hour: "numeric", minute: "2-digit" }) })}</span>
       </div>
-    </div>
+    </Link>
   );
 }

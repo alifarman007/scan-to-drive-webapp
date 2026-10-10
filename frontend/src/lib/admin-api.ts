@@ -76,10 +76,60 @@ export type Dashboard = {
   };
 };
 
+/** A row of the trip history (same fields as a live trip, plus the end). */
+export type HistoryTrip = LiveTrip & {
+  end_km: number | null;
+  distance_km: number | null;
+  end_place: string | null;
+  end_confirm_time: string | null;
+  close_reason: string | null;
+  start_no_scan_reason: string | null;
+  end_no_scan_reason: string | null;
+  approval_note: string | null;
+  approved_at: string | null;
+  reg_number: string;
+};
+
+export type TripPage = { total: number; total_km: number; limit: number; offset: number; trips: HistoryTrip[] };
+
+export type TimelineEvent = {
+  id: number;
+  at: string;
+  event: string;
+  label: string;
+  actor: string;
+  who: { kind: "driver" | "passenger" | "visitor" | "admin" | "system"; ref: string | null; name: string | null };
+  ip: string | null;
+  device: string | null;
+  lat: number | null;
+  lng: number | null;
+  detail: Record<string, unknown> | null;
+};
+
+export type TripDetail = {
+  trip: HistoryTrip & {
+    driver: { id: number; employee_id: string; name: string; phone: string | null };
+    passenger: { id: number; employee_id: string; name: string; department: string | null } | null;
+    visitor: { name: string; phone: string; reason: string | null } | null;
+    vehicle: { id: number; car_code: string; model: string; reg_number: string };
+    map_points: { start: { lat: number; lng: number } | null; end: { lat: number; lng: number } | null };
+    photos: { start: { url: string | null }; end: { url: string | null } };
+    approved_by_name: string | null;
+    lock: { stage: "start" | "end"; locked: boolean; tries_left: number } | null;
+  };
+  timeline: TimelineEvent[];
+  alerts: Alert[];
+};
+
 export const adminApi = {
   dashboard: (signal?: AbortSignal) => api<Dashboard>("/admin/dashboard", { signal }),
   solveAlert: (id: number, note: string) => api<{ alert: Alert }>(`/admin/alerts/${id}/solve`, { json: { note } }),
   signOut: () => api("/auth/logout", { method: "POST", query: { who: "admin" } }),
+  closeTrip: (id: number, reason: string, endKm?: number) =>
+    api(`/admin/trips/${id}/close`, { json: { reason, ...(endKm ? { end_km: endKm } : {}) } }),
+  unlockTrip: (id: number, reason: string) => api(`/admin/trips/${id}/unlock`, { json: { reason } }),
+  decideApproval: (id: number, decision: "approved" | "rejected", note: string) =>
+    api(`/admin/trips/${id}/approval`, { json: { decision, note } }),
 };
 
 /** The session ended (8 hours, or the account was turned off): back to sign-in, then back to this page. */
