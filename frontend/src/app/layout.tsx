@@ -13,6 +13,8 @@ import "@fontsource/hind-siliguri/500.css";
 import "@fontsource/hind-siliguri/600.css";
 import "./globals.css";
 
+import { Preloader } from "@/components/preloader";
+
 import { Providers } from "./providers";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -39,6 +41,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} suppressHydrationWarning>
       <body className="min-h-dvh">
+        <Preloader />
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

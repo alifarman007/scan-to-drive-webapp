@@ -245,3 +245,179 @@
     transform: translateY(-4px) scale(0.97);
   }
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Opening preloader (src/components/preloader.tsx). Timeline, about 3 s:
+   0.15 logo sharpens in · 0.9 line draws · 1.2 motto rises letter by letter · 2.6 curtain lifts · 3.3 gone.
+   --------------------------------------------------------------------------------------------- */
+.s2d-preloader {
+  display: none;
+}
+.s2d-intro .s2d-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 40%, #233a86 0%, #1c2e6f 45%, #0f1a3d 100%);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  animation: s2d-curtain 0.75s cubic-bezier(0.76, 0, 0.24, 1) 2.6s forwards;
+}
+.s2d-intro-done .s2d-preloader {
+  display: none;
+}
+.s2d-preloader__glow {
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(21 93 252 / 0.32), transparent 62%);
+  animation: s2d-glow 2.6s ease-in-out both;
+}
+.s2d-preloader__stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0 1.5rem;
+  animation: s2d-stage-out 0.6s cubic-bezier(0.76, 0, 0.24, 1) 2.45s forwards;
+}
+.s2d-preloader__logo {
+  width: clamp(9.5rem, 30vw, 13.5rem);
+  height: auto;
+  animation: s2d-logo 1s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+.s2d-preloader__line {
+  display: block;
+  height: 2px;
+  width: clamp(9rem, 28vw, 12.5rem);
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #9fb4f5 20%, #155dfc 50%, #9fb4f5 80%, transparent);
+  transform-origin: center;
+  animation: s2d-line 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.85s both;
+}
+.s2d-preloader__motto {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.42em;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 0.8rem + 0.8vw, 1.25rem);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: #e7ebf6;
+}
+.s2d-preloader__word {
+  display: inline-flex;
+  overflow: hidden;
+  padding-bottom: 0.1em;
+}
+.s2d-preloader__char {
+  display: inline-block;
+  animation: s2d-char 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(1.15s + var(--i) * 0.028s);
+}
+/* the page rises a little as the curtain lifts */
+.s2d-intro:not(.s2d-intro-done) body > * {
+  animation: s2d-page-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) 2.75s both;
+}
+.s2d-intro:not(.s2d-intro-done) body > .s2d-preloader,
+.s2d-intro:not(.s2d-intro-done) body > script {
+  animation-name: none;
+}
+@keyframes s2d-logo {
+  from {
+    opacity: 0;
+    filter: blur(14px);
+    transform: scale(0.86) translateY(8px);
+    clip-path: inset(0 100% 0 0);
+  }
+  60% {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes s2d-line {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+@keyframes s2d-char {
+  from {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes s2d-glow {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.05);
+    opacity: 0.85;
+  }
+}
+@keyframes s2d-stage-out {
+  to {
+    transform: translateY(-2.5rem) scale(0.96);
+    opacity: 0;
+  }
+}
+@keyframes s2d-curtain {
+  to {
+    transform: translateY(-100%);
+    border-bottom-left-radius: 50% 6rem;
+    border-bottom-right-radius: 50% 6rem;
+  }
+}
+@keyframes s2d-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(1.5rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s2d-intro .s2d-preloader,
+  .s2d-intro .s2d-preloader * {
+    animation: none !important;
+  }
+  .s2d-intro .s2d-preloader {
+    animation: s2d-fade-out 0.4s ease 1.4s forwards !important;
+  }
+  .s2d-intro:not(.s2d-intro-done) body > * {
+    animation: none;
+  }
+  @keyframes s2d-fade-out {
+    to {
+      opacity: 0;
+      visibility: hidden;
+    }
+  }
+}

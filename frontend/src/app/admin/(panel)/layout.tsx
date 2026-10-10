@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { Card } from "@/components/ui/card";
 import { safeNext } from "@/lib/api";
-import { getAdminSession } from "@/lib/server-api";
+import { getAdminSession, serverGet } from "@/lib/server-api";
 
 /** Every admin page needs a signed-in admin or viewer. An ended session goes to sign-in and comes back here. */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +16,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     const here = safeNext((await headers()).get("x-s2d-path"), "/admin");
     redirect(`/admin/login?next=${encodeURIComponent(here)}&expired=1`);
   }
-  return <AdminShell user={admin}>{children}</AdminShell>;
+  // the open-alerts count on the Alerts menu item and the phone dock
+  const alerts = await serverGet<{ total: number }>("/admin/alerts?status=open&limit=1");
+  return (
+    <AdminShell user={admin} openAlerts={alerts.data?.total ?? 0}>
+      {children}
+    </AdminShell>
+  );
 }
 
 async function Offline() {

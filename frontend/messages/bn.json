@@ -796,5 +796,16 @@
         "alert_solved": "সতর্কতার সমাধান"
       }
     }
+  },
+  "dock": {
+    "trips": "যাত্রা",
+    "more": "আরও",
+    "searchTitle": "যাত্রা খুঁজুন",
+    "moreTitle": "সব পাতা",
+    "quickToday": "আজকের যাত্রা",
+    "quickDriving": "এখন চলছে",
+    "quickApproval": "অনুমোদন দরকার",
+    "quickCheck": "অফিস দেখবে",
+    "lookAndLanguage": "ভাষা ও রং"
   }
 }

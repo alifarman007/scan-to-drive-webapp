@@ -37,3 +37,6 @@ export const FOOT_NAV: NavItem[] = [
 export function isActive(pathname: string, href: string) {
   return href === "/admin" ? pathname === "/admin" : pathname === href || pathname.startsWith(`${href}/`);
 }
+
+/** Epic Group's motto (shown on the opening screen and at the foot of the sidebar). */
+export const MOTTO = "Relentless pursuit of better";

@@ -796,5 +796,16 @@
         "alert_solved": "Alert solved"
       }
     }
+  },
+  "dock": {
+    "trips": "Trips",
+    "more": "More",
+    "searchTitle": "Search trips",
+    "moreTitle": "All pages",
+    "quickToday": "Today's trips",
+    "quickDriving": "Driving now",
+    "quickApproval": "Needs approval",
+    "quickCheck": "Office to check",
+    "lookAndLanguage": "Language and look"
   }
 }

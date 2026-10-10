@@ -662,6 +662,24 @@ Frontend:
 - [ ] To verify on the laptop: open Trip history, try the filters and the top-bar search; open a trip and zoom into a photo. Make a trip with
       "Passenger can't scan" and approve it; block a Start QR with 5 wrong IDs on a phone and unlock it; close a trip that is still running.
 
+### 2026-10-10 (look and feel: opening screen, floating sidebar, phone dock)
+
+- [x] Opening screen (`src/components/preloader.tsx`, styles at the end of `globals.css`): navy screen, the Epic logo comes into focus,
+      a light line draws under it, "Relentless pursuit of better" rises letter by letter, then the screen lifts like a curtain and the page
+      rises into place (about 3 seconds). Plain HTML and CSS, so it starts at once, before the app's JavaScript has loaded.
+      Shown once per browser tab (reloads and moving between pages skip it). Never on the passenger page (`/p/...`), where the one-time
+      code is already counting down. With "reduce motion" on, it only fades.
+- [x] Laptop sidebar floats: inset from the edges, rounded corners, soft shadow, a faint light along the top edge. The motto sits at its foot.
+      The Alerts item shows the number of open alerts.
+- [x] Phones (admin pages): a floating header (logo and account) and a floating dock at the bottom in thumb reach: Dashboard, Trips,
+      a raised Search button in the middle, Alerts (with the open count) and More. The active item has a sliding highlight; a light buzz on tap.
+      The dock slides away while scrolling down a list and comes back on scrolling up. Search opens a sheet with the search box and quick
+      picks (today's trips, driving now, needs approval, office to check). More opens a sheet with every other page as tiles, plus language
+      and light / dark. This replaces the slide-in menu on phones.
+- [x] Checked in the sandbox (laptop and phone): opening screen timing, skipped on reload and on the passenger page, dock hiding and showing,
+      search and More sheets. Lint, types and production build pass.
+- [ ] To verify: open the app in a new tab on the laptop and on a phone; open the admin pages on a phone.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -905,7 +923,8 @@ frontend/                  Next.js app
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
   src/app/                 pages: / (start), /admin/* (behind sign-in), /driver, /styleguide (development only)
   src/components/ui/       shared pieces: Button, Input, Card, StatusChip, Odometer, CountdownRing, Reveal, ThemeToggle, LanguageSwitch
-  src/components/admin/    admin frame (sidebar, top bar) and the menu list
+  src/components/admin/    admin frame (floating sidebar, top bar), phone dock (mobile-dock.tsx) and the menu list
+  src/components/preloader.tsx opening screen with the logo and motto (once per tab)
   src/i18n/                language from the cookie (next-intl)
   src/app/api/[...path]/   passes /api/... on to FastAPI (with the caller's IP)
   src/app/driver/, src/app/c/  driver sign-in, driver home, car sticker landing
