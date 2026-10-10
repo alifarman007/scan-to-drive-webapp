@@ -213,3 +213,13 @@
     background-position: -100% 0;
   }
 }
+
+/* the dashed line between "from" and "to" drifts downwards, like a road passing by */
+@keyframes route-dash {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

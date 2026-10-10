@@ -1,10 +1,11 @@
-import { ArrowRightIcon, WifiSlashIcon } from "@phosphor-icons/react/ssr";
+import { ArrowRightIcon, InfoIcon, WifiSlashIcon } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { CarCodeForm } from "@/components/driver/car-code-form";
 import { DriverFrame } from "@/components/driver/driver-frame";
+import { ScanCarButton } from "@/components/driver/qr-scanner";
 import { ScanVisual } from "@/components/driver/scan-visual";
 import { SignOutButton } from "@/components/driver/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
@@ -47,7 +48,8 @@ function greetingKey(): "morning" | "afternoon" | "evening" {
 }
 
 /** Driver home: greeting, the open trip if there is one, otherwise "scan the sticker". */
-export default async function DriverHome() {
+export default async function DriverHome({ searchParams }: { searchParams: Promise<{ notice?: string }> }) {
+  const { notice } = await searchParams;
   const { driver, offline } = await getDriverSession();
   const t = await getTranslations("driverHome");
 
@@ -80,6 +82,14 @@ export default async function DriverHome() {
       }
       footer={<SignOutButton />}
     >
+      {notice === "cancelled" && !trip ? (
+        <Reveal>
+          <p className="flex items-center gap-2.5 rounded-2xl bg-card px-4 py-3 text-sm font-semibold text-title shadow-lift">
+            <InfoIcon size={18} weight="fill" className="shrink-0 text-accent" />
+            {t("noticeCancelled")}
+          </p>
+        </Reveal>
+      ) : null}
       {trip ? (
         <Reveal delay={0.05}>
           <Card className="flex flex-col gap-4 border-0 p-5 shadow-lift">
@@ -99,7 +109,7 @@ export default async function DriverHome() {
               <Odometer value={trip.start_km} size="sm" />
             </div>
             <Link
-              href={`/c/${encodeURIComponent(trip.car_code)}`}
+              href="/driver/trip"
               className={cn(buttonVariants({ size: "xl", lift: true }))}
             >
               {t("openTrip")}
@@ -115,7 +125,12 @@ export default async function DriverHome() {
               <h2 className="font-display text-xl font-bold text-title">{t("scanTitle")}</h2>
               <p className="text-sm text-muted">{t("scanBody")}</p>
             </div>
-            <div className="h-px bg-border" />
+            <ScanCarButton />
+            <div className="flex items-center gap-3 text-xs font-semibold text-muted uppercase">
+              <span className="h-px flex-1 bg-border" />
+              {t("or")}
+              <span className="h-px flex-1 bg-border" />
+            </div>
             <CarCodeForm />
           </Card>
         </Reveal>

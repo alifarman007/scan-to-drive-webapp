@@ -155,7 +155,20 @@ def active_trip(driver: Driver = Depends(current_driver), db: Session = Depends(
         "start_qr_blocked": blocked,
         "end_qr_blocked": end_blocked,
         "reminders": driver_reminders(db, trip) if trip else [],  # from the background checks (PDF 11.4)
+        # for the app: show "Passenger can't scan" only when allowed; full length of a QR for the countdown ring
+        "allow_cant_scan": bool(app_settings.get_int(db, "allow_cant_scan")),
+        "qr_expiry_minutes": app_settings.get_int(db, "qr_expiry_minutes"),
     }
+
+
+@router.get("/{trip_id}")
+def my_trip(trip_id: int, driver: Driver = Depends(current_driver), db: Session = Depends(get_db)):
+    """One of the driver's own trips in any status (the app shows the summary after the end is confirmed,
+    or what happened if the admin closed or cancelled it)."""
+    trip = db.get(Trip, trip_id)
+    if trip is None or trip.driver_id != driver.id:
+        raise api_error(404, "TRIP_NOT_FOUND", "Trip not found")
+    return {"trip": trip_out(trip)}
 
 
 def _own_waiting_trip(db: Session, trip_id: int, driver: Driver) -> Trip:

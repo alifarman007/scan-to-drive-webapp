@@ -22,10 +22,13 @@ export function Odometer({
   size = "md",
   framed = size !== "sm",
   rollIn = true,
+  from,
   unit,
   className,
 }: {
   value: number;
+  /** Start the digits at this number and roll to `value` (end of a trip: start km rolls up to end km). */
+  from?: number;
   minDigits?: number;
   size?: keyof typeof SIZES;
   framed?: boolean;
@@ -35,8 +38,10 @@ export function Odometer({
   className?: string;
 }) {
   const s = SIZES[size];
-  const text = Math.max(0, Math.floor(value)).toString().padStart(minDigits, "0");
-  const digits = text.split("").map(Number);
+  const width = Math.max(minDigits, String(Math.floor(Math.max(0, value))).length, String(Math.floor(Math.max(0, from ?? 0))).length);
+  const digits = Math.max(0, Math.floor(value)).toString().padStart(width, "0").split("").map(Number);
+  const fromDigits =
+    from === undefined ? null : Math.max(0, Math.floor(from)).toString().padStart(width, "0").split("").map(Number);
 
   return (
     <span className={cn("inline-flex items-end gap-2.5", className)}>
@@ -53,7 +58,7 @@ export function Odometer({
             height={s.h}
             className={s.tile}
             last={i === digits.length - 1}
-            rollIn={rollIn}
+            initialDigit={fromDigits ? fromDigits[i] : rollIn ? 0 : null}
           />
         ))}
       </span>
@@ -67,13 +72,14 @@ function Digit({
   height,
   className,
   last,
-  rollIn,
+  initialDigit,
 }: {
   digit: number;
   height: number;
   className: string;
   last: boolean;
-  rollIn: boolean;
+  /** where this digit starts before rolling; null = no roll, just show it */
+  initialDigit: number | null;
 }) {
   return (
     <span
@@ -87,7 +93,7 @@ function Digit({
     >
       <motion.span
         className="absolute inset-x-0 top-0 flex flex-col"
-        initial={rollIn ? { y: "0%" } : false}
+        initial={initialDigit === null ? false : { y: `${-initialDigit * 10}%` }}
         animate={{ y: `${-digit * 10}%` }}
         transition={{ type: "spring", stiffness: 120, damping: 18, mass: 0.9 }}
       >
