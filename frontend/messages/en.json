@@ -878,5 +878,262 @@
     "quickApproval": "Needs approval",
     "quickCheck": "Office to check",
     "lookAndLanguage": "Language and look"
+  },
+  "fleet": {
+    "clearSearch": "Clear search",
+    "ratingTitle": "Passenger rating {avg} out of 5 ({count, plural, one {# rating} other {# ratings}})",
+    "activity": {
+      "title": "Last 30 days",
+      "hint": "{km} km · {trips, plural, one {# trip} other {# trips}} · on the road {days, plural, one {# day} other {# days}}",
+      "dayValue": "{km} km · {trips, plural, one {# trip} other {# trips}}",
+      "today": "Today",
+      "empty": "No trips in the last 30 days."
+    },
+    "recent": {
+      "title": "Latest trips",
+      "all": "All trips",
+      "empty": "No trips yet."
+    }
+  },
+  "cars": {
+    "title": "Cars",
+    "summary": "{cars, plural, one {# car} other {# cars}} · {km} km driven in total",
+    "add": "Add car",
+    "searchLabel": "Search cars",
+    "searchHint": "Code, plate, model or driver",
+    "filterLabel": "Show",
+    "filter": {
+      "all": "All",
+      "on_trip": "On a trip",
+      "available": "Free",
+      "maintenance": "Workshop",
+      "inactive": "Off the fleet"
+    },
+    "state": {
+      "on_trip": "On a trip",
+      "waiting": "Waiting",
+      "available": "Free",
+      "maintenance": "Workshop",
+      "inactive": "Off the fleet"
+    },
+    "alerts": "{count, plural, one {# alert} other {# alerts}}",
+    "tripsShort": "trips",
+    "emptyTitle": "No car matches",
+    "emptyBody": "Try another search or show all cars.",
+    "noneTitle": "No cars yet",
+    "noneBody": "Add the first car, then print its QR sticker.",
+    "back": "Cars",
+    "notFoundTitle": "Car not found",
+    "notFoundBody": "The link may be old. Go back to the list of cars.",
+    "edit": "Edit",
+    "fixKm": "Correct km",
+    "newCarNote": "Car added. Print its QR sticker and put it inside the car, where the driver can scan it.",
+    "odometer": "Odometer now",
+    "onTripWith": "On a trip with",
+    "stats": {
+      "trips": "Trips",
+      "km": "Km driven",
+      "rating": "Passenger rating",
+      "ratingOf": "of 5 · {count}",
+      "lastTrip": "Last trip"
+    },
+    "openAlerts": "{count, plural, one {# open alert} other {# open alerts}} for this car",
+    "saved": "Changes saved",
+    "kmSaved": "Km corrected",
+    "stickerRenewed": "New sticker v{v} is ready to print",
+    "statusSaved": {
+      "active": "Car is back in use",
+      "maintenance": "Car is in the workshop",
+      "inactive": "Car taken off the fleet"
+    },
+    "statusTitle": "Car status",
+    "statusHint": {
+      "active": "In use: drivers can start trips with it.",
+      "maintenance": "In the workshop: the sticker says the car cannot be used now.",
+      "inactive": "Off the fleet: kept with all its trips, but no new trips."
+    },
+    "status": {
+      "active": "In use",
+      "maintenance": "Workshop",
+      "inactive": "Off"
+    },
+    "sticker": {
+      "title": "QR sticker",
+      "hint": "Inside the car, where the driver can scan it.",
+      "version": "Version {v}",
+      "qrLabel": "QR code of {code}",
+      "print": "Print sticker",
+      "a4Hint": "The sticker on an A4 page, for an office printer",
+      "replace": "Sticker lost or damaged? Make a new one",
+      "confirmTitle": "Make a new sticker?",
+      "confirmBody": "For {code}, when the sticker is lost, damaged or may have been copied.",
+      "confirmWarn": "The old sticker (v{v}) stops working at once. Print the new one and put it in the car.",
+      "keep": "Keep the old one",
+      "confirm": "Make new sticker",
+      "failed": "Could not make a new sticker. Try again."
+    },
+    "form": {
+      "addTitle": "Add a car",
+      "addHint": "The car code goes on its QR sticker and cannot be changed later.",
+      "editTitle": "Edit {code}",
+      "code": "Car code",
+      "codeHint": "Letters, digits and dashes, for example CAR-11.",
+      "codeBad": "2 to 20 letters, digits or dashes, for example CAR-11.",
+      "reg": "Registration number",
+      "platePreview": "On the plate",
+      "model": "Model",
+      "km": "Odometer now (km)",
+      "kmHint": "The first trip cannot start below this.",
+      "kmBad": "Up to 7 digits.",
+      "required": "Please fill this in.",
+      "add": "Add car",
+      "save": "Save changes"
+    },
+    "km": {
+      "title": "Correct the km",
+      "hint": "Only when the odometer and the app do not agree. Every correction is kept in the log with its reason.",
+      "now": "Odometer",
+      "new": "Correct km",
+      "same": "Type a different number.",
+      "diff": "{diff} km from now",
+      "reason": "Reason",
+      "reason1": "Odometer replaced",
+      "reason2": "Typing mistake on a trip",
+      "reason3": "Driven outside the app",
+      "reasonPlaceholder": "Or write the reason",
+      "reasonNeeded": "Please give a reason.",
+      "save": "Save km"
+    },
+    "errors": {
+      "CAR_CODE_EXISTS": "A car with this code already exists.",
+      "REG_NUMBER_EXISTS": "A car with this registration number already exists.",
+      "CAR_EXISTS": "A car with this code or registration number already exists.",
+      "CAR_HAS_OPEN_TRIP": "This car is on a trip. Finish or close the trip first.",
+      "REASON_REQUIRED": "Please give a reason.",
+      "check": "Please check what you typed.",
+      "network": "No connection. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "drivers": {
+    "title": "Drivers",
+    "summary": "{active} active of {total}",
+    "add": "Add driver",
+    "searchLabel": "Search drivers",
+    "searchHint": "Name, ID, phone or licence",
+    "filterLabel": "Show",
+    "filter": {
+      "all": "All",
+      "on_trip": "Driving",
+      "free": "Free",
+      "inactive": "Turned off"
+    },
+    "state": {
+      "on_trip": "Driving {car}",
+      "waiting": "Waiting · {car}",
+      "free": "Free",
+      "inactive": "Turned off"
+    },
+    "noPin": "No PIN yet",
+    "tripsShort": "trips",
+    "emptyTitle": "No driver matches",
+    "emptyBody": "Try another search or show all drivers.",
+    "noneTitle": "No drivers yet",
+    "noneBody": "Add the first driver. They choose their own PIN at the first sign-in.",
+    "back": "Drivers",
+    "notFoundTitle": "Driver not found",
+    "notFoundBody": "The link may be old. Go back to the list of drivers.",
+    "edit": "Edit",
+    "noPhone": "No phone number",
+    "license": "Licence",
+    "since": "Added {date}",
+    "newDriverNote": "Driver added. On the first sign-in with {id} and any 4 digits, the app asks them to choose their own PIN.",
+    "onTripNow": "Driving {car} now",
+    "stats": {
+      "trips": "Trips",
+      "km": "Km driven",
+      "rating": "Passenger rating",
+      "ratingOf": "of 5 · {count}",
+      "lastTrip": "Last trip"
+    },
+    "saved": "Changes saved",
+    "pinResetDone": "PIN removed. The driver chooses a new one at the next sign-in.",
+    "statusSaved": {
+      "active": "Driver turned on again",
+      "inactive": "Driver turned off"
+    },
+    "pin": {
+      "setTitle": "PIN is set",
+      "setBody": "The driver signs in with their own 4-digit PIN.",
+      "notSetTitle": "Not signed in yet",
+      "notSetBody": "At the first sign-in with {id} and any 4 digits, the driver chooses a PIN.",
+      "reset": "Reset PIN",
+      "confirmTitle": "Reset {name}'s PIN?",
+      "confirmBody": "The PIN is removed. At the next sign-in with {id} the driver chooses a new one. Already signed-in phones stay signed in.",
+      "keep": "Cancel",
+      "confirm": "Reset PIN",
+      "failed": "Could not reset the PIN. Try again."
+    },
+    "account": {
+      "title": "Account",
+      "onBody": "Active: can sign in and drive.",
+      "offBody": "Turned off: cannot sign in. All trips are kept.",
+      "turnOff": "Turn off",
+      "turnOn": "Turn on again",
+      "confirmTitle": "Turn off {name}?",
+      "confirmBody": "For a driver who left or is on long leave. They cannot sign in any more; their trips stay in the history. You can turn them on again.",
+      "keep": "Cancel"
+    },
+    "form": {
+      "addTitle": "Add a driver",
+      "addHint": "No PIN here: the driver chooses one at the first sign-in.",
+      "editTitle": "Edit {name}",
+      "previewName": "New driver",
+      "id": "Driver ID",
+      "idHint": "The next free ID is filled in. It cannot be changed later.",
+      "idBad": "Letters, digits and dashes, for example DR9005.",
+      "name": "Full name",
+      "namePlaceholder": "As on the licence",
+      "phone": "Phone",
+      "phoneBad": "Digits, spaces and dashes only.",
+      "license": "Licence number",
+      "optional": "Optional",
+      "required": "Please fill this in.",
+      "add": "Add driver",
+      "save": "Save changes"
+    },
+    "errors": {
+      "EMPLOYEE_ID_EXISTS": "A driver with this ID already exists.",
+      "DRIVER_HAS_OPEN_TRIP": "This driver is on a trip. Finish or close the trip first.",
+      "check": "Please check what you typed.",
+      "network": "No connection. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "alertsPage": {
+    "title": "Alerts",
+    "summary": "{open} open · {solved} solved",
+    "statusLabel": "Show",
+    "status": {
+      "open": "Open",
+      "solved": "Solved",
+      "all": "All"
+    },
+    "searchLabel": "Search alerts",
+    "searchHint": "Trip, car or words",
+    "carLabel": "Car",
+    "allCars": "All cars",
+    "typeLabel": "Kind of alert",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "solvedFlash": "Alert solved",
+    "solvedBy": "Solved by {name} · {time}",
+    "showMore": "Show more ({left} left)",
+    "clearTitle": "All clear",
+    "clearBody": "No open alerts. The checks run every minute and anything new shows up here.",
+    "noneSolvedTitle": "Nothing here yet",
+    "noneSolvedBody": "Solved alerts show up here, with who solved them and the note.",
+    "noneFilteredTitle": "No alert matches",
+    "noneFilteredBody": "Try another kind, car or search."
   }
 }

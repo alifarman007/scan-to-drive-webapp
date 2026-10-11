@@ -751,6 +751,45 @@ Frontend:
 - [ ] To verify on the phones: scan a car sticker while signed out (sign in, then the start page); passenger confirms the start with an ID and
       a name; at the end tap "Scan the end QR" (or reopen the page), confirm with one tap and rate; try the end on a second phone with the ID.
 
+### 2026-10-11 (frontend step 7: cars and QR stickers, drivers, alerts)
+
+Backend (no database change):
+- [x] Car list and car page: passengers' average rating, number of open alerts. Car page also has km and trips per day for the last 30 days.
+- [x] Driver list: average rating per driver and `next_employee_id` (the next free DR number, for the add form). Driver page: rating,
+      last 10 trips, km per day (30 days), the car of the open trip. New driver IDs are saved in capitals.
+- [x] Alerts list: filter by car (`car_id`) and search (`q`: message, trip number, car code); `counts` (open / solved) and `by_type`
+      (open alerts per kind) for the filter chips; each alert has the driver's name and who solved it.
+- [x] Printed sticker redesigned: navy band with the Epic logo and "Scan-to-Drive", the QR in the middle with a wide white margin,
+      car code and "Scan to start trip" under it, version in the corner. Still 6 x 6 cm (or on an A4 page). Checked that a QR reader
+      decodes it. The logo file is `backend/app/assets/epic-logo-light.png`.
+- [x] 297 tests pass (3 new).
+
+Frontend:
+- [x] Cars `/admin/cars`: every car as a card with a coloured edge for what it is doing (free, on a trip, waiting, workshop, off the fleet),
+      model, number plate, odometer, trips and km, rating, open alerts, and the driver when it is on a trip. Search (code, plate, model,
+      driver) and a switch with counts; both stay in the address. "Add car" suggests the next code (CAR-13) and opens the new car's page.
+- [x] Car page `/admin/cars/{id}`: odometer, trips, km, rating, last trip, open trip, open alerts, 30-day chart (hover a day for its
+      km and trips), last 10 trips with "All trips". On the right the QR sticker drawn like the printed one (it tilts a little towards the
+      mouse), "Print sticker" (6 x 6 cm PDF) and "A4", and "Make a new one" with a warning that the old sticker stops working (the QR turns
+      over to the new one). Car status: In use / Workshop / Off (a car on a trip cannot be taken out). Edit plate and model; correct the km
+      with a reason (quick picks, the odometer shows the change).
+- [x] Drivers `/admin/drivers`: cards with initials on a colour (the same colour for the same person), ID, phone, what they are doing,
+      "No PIN yet" for drivers who have not signed in, trips, km and rating. Search and switch like the cars. "Add driver" fills in the next
+      free ID (DR9005 ...) and opens the new driver's page, which says how the first sign-in works.
+- [x] Driver page `/admin/drivers/{id}`: profile header (phone to call, licence), numbers, 30-day chart, last trips; PIN card (set or not,
+      "Reset PIN" with a confirmation); Account card (turn off a driver who left, turn on again; not while on a trip).
+- [x] Alerts `/admin/alerts`: Open / Solved / All with counts, search, car, and a chip for each kind with its open count; grouped by
+      day (Today, Yesterday, date). Each alert links to its car and trip and shows the driver; open ones have "Solve" with a note (the card
+      slides away), solved ones say who solved it, when, and the note. "All clear" when nothing is open. All filters are in the address.
+- [x] After each change a small "Saved" message comes up at the bottom. Viewers see everything but no buttons.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox (laptop 1440 px, phone 390 px, light and dark, Bangla): list filters and search, add a car (suggested code,
+      plate preview), sticker PDF, duplicate plate refused, km correction needs a reason, new sticker, workshop and back, a car on a trip
+      refused for the workshop, add a driver (suggested ID), the new driver's first sign-in asks for a PIN, edit, turn off and on, reset PIN
+      dialog, alerts tabs and kinds, solve with a note. No sideways scrolling on phones. No browser errors. Lint, types and build pass.
+- [ ] To verify on the laptop: add a car and print its sticker (check the size on paper), scan it with a phone; add a driver and sign in with
+      the new ID on a phone; solve an alert.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -890,7 +929,7 @@ npm run start:lan             # run the production build for phones (faster than
 | POST | `/api/trips/{id}/end-cant-scan` | driver | passenger cannot scan the End QR: trip completes, marked for admin approval |
 | GET | `/api/admin/trips/approvals` | admin / viewer | trips waiting for an approval decision |
 | POST | `/api/admin/trips/{id}/approval` | admin | approve or reject (rejection needs a note) |
-| GET | `/api/admin/alerts` | admin / viewer | alerts list (filter by status and type) |
+| GET | `/api/admin/alerts` | admin / viewer | alerts list (filter by status, type, car, search; counts per status and kind) |
 | POST | `/api/admin/alerts/{id}/solve` | admin | mark an alert as solved, with a note |
 | GET | `/api/admin/dashboard` | admin / viewer | cards, car board, live trips, alerts, charts |
 | GET | `/api/admin/trips` | admin / viewer | trip history with filters and search |
@@ -898,12 +937,12 @@ npm run start:lan             # run the production build for phones (faster than
 | GET | `/api/admin/photos/{trip_id}/{kind}` | signed link | dashboard photo, link valid 10 minutes |
 | GET | `/api/admin/audit` | admin | audit log search |
 | GET | `/api/admin/cars` | admin / viewer | car list with totals and open trip; filters `q`, `status` |
-| GET | `/api/admin/cars/{id}` | admin / viewer | one car, totals and last 10 trips |
+| GET | `/api/admin/cars/{id}` | admin / viewer | one car, totals, rating, last 10 trips, km per day (30 days) |
 | POST | `/api/admin/cars` | admin | add a car |
 | PATCH | `/api/admin/cars/{id}` | admin | edit registration, model, status; correct km with a reason |
 | POST | `/api/admin/cars/{id}/new-sticker` | admin | new sticker version; the old sticker stops working |
 | GET | `/api/admin/cars/{id}/qr.pdf` | admin | printable QR sticker (`layout=sticker` or `a4`) |
-| GET | `/api/admin/drivers` | admin / viewer | driver list with totals; also `/{id}` |
+| GET | `/api/admin/drivers` | admin / viewer | driver list with totals, ratings and the next free driver ID; `/{id}` adds last trips and km per day |
 | POST | `/api/admin/drivers` | admin | add a driver (no PIN) |
 | PATCH | `/api/admin/drivers/{id}` | admin | edit driver, set active / inactive |
 | POST | `/api/admin/drivers/{id}/reset-pin` | admin | remove the PIN; driver sets a new one at next sign-in |
@@ -975,6 +1014,7 @@ backend/
                            phone normalizing (phones.py)
   app/storage.py           photo storage (local folder now, Azure Blob later)
   app/errors.py            error format helper; app/schemas.py response shapes
+  app/services/activity.py km per day and ratings for the car and driver pages
   app/seed.py              development seed data
   app/rename_ids.py        one-off: new driver IDs (DR9001 ...) and passenger IDs without the dash, keeping all trips
   app/set_password.py      command to change/create admin passwords
@@ -1012,6 +1052,7 @@ frontend/                  Next.js app
   src/components/passenger/identity-forms.tsx "who are you" forms (employee ID + optional name, visitor), used on both pages
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
+  src/components/admin/fleet/ cars, drivers and alerts pages (cars.tsx, drivers.tsx, alerts.tsx) and their shared pieces (shared.tsx)
   src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, two charts
   src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail
   src/components/admin/trips/ history list and filter bar, detail page, meter check with photo zoom, timeline, admin action dialogs
@@ -1028,9 +1069,9 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (2026-10-11 changes) on the laptop and phones, and commit.
-2. Frontend step 7: admin lists (cars and QR stickers, drivers, alerts). Passengers, reports, audit log and overtime stay hidden for now.
-3. Then steps 8-9 as listed in the frontend step 1 entry.
+1. Verify the unchecked items above (2026-10-11 changes and step 7) on the laptop and phones, and commit.
+2. Frontend step 8: users (accounts, passwords) and settings (QR expiry, limits, visitors, purposes). Reports stay hidden for now.
+3. Then step 9: polish, phone test over HTTPS, Docker and Azure.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 5. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
 

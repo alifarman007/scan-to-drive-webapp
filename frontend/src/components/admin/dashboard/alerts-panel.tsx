@@ -26,7 +26,7 @@ import { adminApi, isSignedOut, toSignIn, type Alert, type AlertType } from "@/l
 
 import { PanelTitle } from "./bits";
 
-const ICON: Record<AlertType, typeof GaugeIcon> = {
+export const ALERT_ICON: Record<AlertType, typeof GaugeIcon> = {
   km_gap: GaugeIcon,
   long_trip: HourglassHighIcon,
   waiting_too_long: ClockIcon,
@@ -91,7 +91,7 @@ function AlertRow({ alert, asOf, onSolved }: { alert: Alert; asOf: string; onSol
   const user = useAdminUser();
   const nowSeconds = useNowSeconds();
   const now = nowSeconds === null ? new Date(asOf) : new Date(nowSeconds * 1000);
-  const Icon = ICON[alert.type] ?? GaugeIcon;
+  const Icon = ALERT_ICON[alert.type] ?? GaugeIcon;
   const serious = alert.type === "wrong_ids" || alert.type === "high_km" || alert.type === "km_gap";
 
   return (
@@ -124,7 +124,7 @@ function AlertRow({ alert, asOf, onSolved }: { alert: Alert; asOf: string; onSol
   );
 }
 
-function SolveButton({ alert, onSolved }: { alert: Alert; onSolved: () => void }) {
+export function SolveButton({ alert, onSolved }: { alert: Alert; onSolved: () => void }) {
   const t = useTranslations("dashboard.alerts");
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");

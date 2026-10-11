@@ -1,5 +1,6 @@
 """Printable car QR sticker (PDF 8 and 11.2): about 6 x 6 cm, the car code printed under the QR."""
 import io
+from pathlib import Path
 
 import qrcode
 from qrcode.constants import ERROR_CORRECT_M
@@ -28,23 +29,56 @@ def _qr_image(link: str) -> ImageReader:
     return ImageReader(buf)
 
 
+NAVY = (0x1C / 255, 0x2E / 255, 0x6F / 255)
+SKY = (0x9F / 255, 0xB4 / 255, 0xF5 / 255)
+LOGO = Path(__file__).resolve().parent.parent / "assets" / "epic-logo-light.png"
+
+
 def _draw_sticker(c: canvas.Canvas, x: float, y: float, car_code: str, qr_version: int) -> None:
-    """Draw one sticker with its lower-left corner at (x, y)."""
+    """Draw one sticker with its lower-left corner at (x, y): a navy band with the Epic logo and the app name,
+    the QR on white in the middle (big quiet zone, so any phone camera reads it), the car code and a short line."""
     size = STICKER_MM * mm
-    pad = 4 * mm
-    qr_size = size - 2 * pad - 12 * mm  # room under the QR for the text
+    band = 11 * mm
+    radius = 3.5 * mm
+    # card and cut line
+    c.setFillColorRGB(1, 1, 1)
+    c.setStrokeColorRGB(0.75, 0.78, 0.85)
     c.setLineWidth(0.3)
     c.setDash(1, 2)
-    c.rect(x, y, size, size)  # cut line
+    c.roundRect(x, y, size, size, radius, stroke=1, fill=1)
     c.setDash()
-    c.drawImage(_qr_image(car_qr_link(car_code, qr_version)), x + (size - qr_size) / 2, y + size - pad - qr_size,
-                qr_size, qr_size)
-    c.setFont("Helvetica-Bold", 13)
-    c.drawCentredString(x + size / 2, y + 7.5 * mm, car_code)
-    c.setFont("Helvetica", 7.5)
-    c.drawCentredString(x + size / 2, y + 3.5 * mm, "Scan to start trip")
+    # navy band along the top (rounded top corners only)
+    path = c.beginPath()
+    path.moveTo(x, y + size - band)
+    path.lineTo(x, y + size - radius)
+    path.arcTo(x, y + size - 2 * radius, x + 2 * radius, y + size, startAng=180, extent=-90)
+    path.lineTo(x + size - radius, y + size)
+    path.arcTo(x + size - 2 * radius, y + size - 2 * radius, x + size, y + size, startAng=90, extent=-90)
+    path.lineTo(x + size, y + size - band)
+    path.close()
+    c.setFillColorRGB(*NAVY)
+    c.drawPath(path, stroke=0, fill=1)
+    if LOGO.exists():
+        logo_h = 5.6 * mm
+        c.drawImage(ImageReader(str(LOGO)), x + 4 * mm, y + size - band + (band - logo_h) / 2, logo_h * 286 / 124, logo_h,
+                    mask="auto")
+    c.setFillColorRGB(1, 1, 1)
+    c.setFont("Helvetica-Bold", 7.5)
+    c.drawRightString(x + size - 4 * mm, y + size - band / 2 - 1.2 * mm, "Scan-to-Drive")
+    # the QR
+    qr_size = 29 * mm
+    qr_top = y + size - band - 3.4 * mm
+    c.drawImage(_qr_image(car_qr_link(car_code, qr_version)), x + (size - qr_size) / 2, qr_top - qr_size, qr_size, qr_size)
+    # car code and the line under it
+    c.setFillColorRGB(*NAVY)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(x + size / 2, y + 8 * mm, car_code)
+    c.setFillColorRGB(0.35, 0.39, 0.47)
+    c.setFont("Helvetica", 6.8)
+    c.drawCentredString(x + size / 2, y + 4.2 * mm, "Scan to start trip")
+    c.setFillColorRGB(*SKY)
     c.setFont("Helvetica", 5)
-    c.drawRightString(x + size - 1.5 * mm, y + 1.2 * mm, f"v{qr_version}")
+    c.drawRightString(x + size - 2.5 * mm, y + 1.8 * mm, f"v{qr_version}")
 
 
 def sticker_pdf(car_code: str, qr_version: int, layout: str = "sticker") -> bytes:

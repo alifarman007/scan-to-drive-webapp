@@ -13,8 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.deps import current_admin_user, get_db, require_admin
 from app.errors import api_error
-from app.models import AdminUser, OPEN_TRIP_STATUSES, Trip, TripStatus, Vehicle, VehicleStatus
+from app.models import Alert, AlertStatus, AdminUser, OPEN_TRIP_STATUSES, Trip, TripStatus, Vehicle, VehicleStatus
 from app.routers.admin_views import DONE, _live_trip
+from app.services.activity import km_by_day, ratings_by
 from app.services.audit import log_event
 from app.services.stickers import car_qr_link, sticker_pdf
 
@@ -84,7 +85,8 @@ def _open_trips(db: Session) -> dict[int, Trip]:
     return {t.vehicle_id: t for t in db.scalars(select(Trip).where(Trip.status.in_(OPEN_TRIP_STATUSES)))}
 
 
-def car_out(v: Vehicle, stats: dict | None, open_trip: Trip | None) -> dict:
+def car_out(v: Vehicle, stats: dict | None, open_trip: Trip | None, rating: dict | None = None,
+            open_alerts: int = 0) -> dict:
     s = stats or {"total_trips": 0, "total_km": 0, "last_trip_at": None}
     return {
         "id": v.id, "car_code": v.car_code, "reg_number": v.reg_number, "model": v.model,
@@ -93,8 +95,20 @@ def car_out(v: Vehicle, stats: dict | None, open_trip: Trip | None) -> dict:
         "open_trip": None if open_trip is None else {
             "id": open_trip.id, "trip_no": open_trip.trip_no, "status": open_trip.status.value,
             "driver_name": open_trip.driver.name},
+        "rating": rating,  # passengers' average stars for trips in this car, or null
+        "open_alerts": open_alerts,
         "created_at": v.created_at,
     }
+
+
+def _open_alerts(db: Session, ids: list[int]) -> dict[int, int]:
+    return dict(db.execute(select(Alert.vehicle_id, func.count()).where(
+        Alert.vehicle_id.in_(ids), Alert.status == AlertStatus.open).group_by(Alert.vehicle_id)).all())
+
+
+def _full_car(db: Session, car: Vehicle) -> dict:
+    return car_out(car, _stats(db, [car.id]).get(car.id), _open_trips(db).get(car.id),
+                   ratings_by(db, Trip.vehicle_id, [car.id]).get(car.id), _open_alerts(db, [car.id]).get(car.id, 0))
 
 
 def _get_car(db: Session, car_id: int, lock: bool = False) -> Vehicle:
@@ -136,8 +150,11 @@ def list_cars(
         where.append(Vehicle.car_code.icontains(t, autoescape=True) | Vehicle.reg_number.icontains(t, autoescape=True)
                      | Vehicle.model.icontains(t, autoescape=True))
     cars = db.scalars(select(Vehicle).where(*where).order_by(Vehicle.car_code)).all()
-    stats, open_trips = _stats(db, [c.id for c in cars]), _open_trips(db)
-    return {"total": len(cars), "cars": [car_out(c, stats.get(c.id), open_trips.get(c.id)) for c in cars]}
+    ids = [c.id for c in cars]
+    stats, open_trips = _stats(db, ids), _open_trips(db)
+    ratings, alerts = ratings_by(db, Trip.vehicle_id, ids), _open_alerts(db, ids)
+    return {"total": len(cars), "cars": [car_out(c, stats.get(c.id), open_trips.get(c.id), ratings.get(c.id), alerts.get(c.id, 0))
+                                         for c in cars]}
 
 
 @router.post("", status_code=201)
@@ -162,13 +179,14 @@ def create_car(
 
 @router.get("/{car_id}")
 def car_detail(car_id: int, _: AdminUser = Depends(current_admin_user), db: Session = Depends(get_db)):
-    """One car with its totals, open trip and last 10 trips. The full history: GET /admin/trips?car_id=."""
+    """One car with its totals, open trip, last 10 trips and km per day (30 days). Full history: GET /admin/trips?car_id=."""
     car = _get_car(db, car_id)
     last = db.scalars(select(Trip).where(Trip.vehicle_id == car.id).order_by(Trip.start_time.desc(), Trip.id.desc()).limit(10)).all()
     now = datetime.now(timezone.utc)
     return {
-        "car": car_out(car, _stats(db, [car.id]).get(car.id), _open_trips(db).get(car.id)),
+        "car": _full_car(db, car),
         "recent_trips": [_live_trip(t, now) for t in last],
+        "km_by_day": km_by_day(db, Trip.vehicle_id == car.id),
     }
 
 
@@ -208,7 +226,7 @@ def update_car(
     except IntegrityError:
         db.rollback()
         raise api_error(409, "REG_NUMBER_EXISTS", "A car with this registration number already exists")
-    return {"car": car_out(car, _stats(db, [car.id]).get(car.id), _open_trips(db).get(car.id))}
+    return {"car": _full_car(db, car)}
 
 
 @router.post("/{car_id}/new-sticker")
@@ -224,7 +242,7 @@ def new_sticker(
     log_event(db, request, "car_sticker_renewed", f"admin:{admin.username}",
               detail={"car_id": car.id, "car_code": car.car_code, "old_version": old, "new_version": car.qr_version})
     db.commit()
-    return {"car": car_out(car, _stats(db, [car.id]).get(car.id), _open_trips(db).get(car.id))}
+    return {"car": _full_car(db, car)}
 
 
 @router.get("/{car_id}/qr.pdf")

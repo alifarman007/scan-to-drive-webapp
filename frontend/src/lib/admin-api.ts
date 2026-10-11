@@ -52,9 +52,66 @@ export type Alert = {
   trip_no: string | null;
   vehicle_id: number | null;
   car_code: string | null;
+  driver_name?: string | null;
   note: string | null;
+  resolved_by_name?: string | null;
+  resolved_at?: string | null;
   created_at: string;
 };
+
+export type AlertPage = {
+  total: number;
+  counts: { open: number; solved: number };
+  by_type: Partial<Record<AlertType, number>>;
+  alerts: Alert[];
+};
+
+/** Passengers' average stars for a car or driver. */
+export type RatingSummary = { average: number; count: number } | null;
+
+/** Km and trips per day, last 30 days (oldest first). */
+export type DayActivity = { date: string; trips: number; km: number };
+
+export type CarStatus = "active" | "maintenance" | "inactive";
+
+export type Car = {
+  id: number;
+  car_code: string;
+  reg_number: string;
+  model: string;
+  current_km: number;
+  status: CarStatus;
+  qr_version: number;
+  qr_link: string;
+  total_trips: number;
+  total_km: number;
+  last_trip_at: string | null;
+  open_trip: null | { id: number; trip_no: string; status: TripStatus; driver_name: string };
+  rating: RatingSummary;
+  open_alerts: number;
+  created_at: string;
+};
+
+export type CarDetail = { car: Car; recent_trips: HistoryTrip[]; km_by_day: DayActivity[] };
+
+export type Driver = {
+  id: number;
+  employee_id: string;
+  name: string;
+  phone: string | null;
+  license_no: string | null;
+  status: "active" | "inactive";
+  has_pin: boolean;
+  total_trips: number;
+  total_km: number;
+  cancelled_trips: number;
+  last_trip_at: string | null;
+  open_trip: null | { id: number; trip_no: string; status: TripStatus; car_code: string };
+  rating: RatingSummary;
+  created_at: string;
+};
+
+export type DriverDetail = { driver: Driver; recent_trips: HistoryTrip[]; km_by_day: DayActivity[] };
 
 export type ReviewTagKey =
   | "safe_driving" | "on_time" | "clean_car" | "polite_driver" | "smooth_ride"
@@ -147,7 +204,24 @@ export const adminApi = {
   unlockTrip: (id: number, reason: string) => api(`/admin/trips/${id}/unlock`, { json: { reason } }),
   decideApproval: (id: number, decision: "approved" | "rejected", note: string) =>
     api(`/admin/trips/${id}/approval`, { json: { decision, note } }),
+
+  addCar: (car: { car_code: string; reg_number: string; model: string; current_km: number; status: CarStatus }) =>
+    api<{ car: Car }>("/admin/cars", { json: car }),
+  updateCar: (id: number, changes: Partial<Pick<Car, "reg_number" | "model" | "status" | "current_km">> & { reason?: string }) =>
+    api<{ car: Car }>(`/admin/cars/${id}`, { method: "PATCH", json: changes }),
+  newSticker: (id: number) => api<{ car: Car }>(`/admin/cars/${id}/new-sticker`, { method: "POST" }),
+
+  addDriver: (d: { employee_id: string; name: string; phone?: string; license_no?: string }) =>
+    api<{ driver: Driver }>("/admin/drivers", { json: d }),
+  updateDriver: (id: number, changes: Partial<Pick<Driver, "name" | "phone" | "license_no" | "status">>) =>
+    api<{ driver: Driver }>(`/admin/drivers/${id}`, { method: "PATCH", json: changes }),
+  resetPin: (id: number) => api<{ driver: Driver }>(`/admin/drivers/${id}/reset-pin`, { method: "POST" }),
 };
+
+/** The printable sticker (PDF). `inline`: open in the browser instead of downloading. */
+export function stickerHref(carId: number, layout: "sticker" | "a4", inline = true) {
+  return `/api/admin/cars/${carId}/qr.pdf?layout=${layout}${inline ? "&inline=true" : ""}`;
+}
 
 /** The session ended (8 hours, or the account was turned off): back to sign-in, then back to this page. */
 export function toSignIn() {

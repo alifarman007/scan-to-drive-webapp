@@ -1,6 +1,7 @@
 """Drivers and Passengers pages (PDF 11.2): list, add, edit, deactivate, reset a driver's PIN, import passengers
 from Excel. Admins and viewers may look; only admins may change anything."""
-from datetime import datetime
+import re
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
@@ -12,7 +13,8 @@ from sqlalchemy.orm import Session
 from app.deps import current_admin_user, get_db, require_admin
 from app.errors import api_error
 from app.models import AdminUser, Driver, OPEN_TRIP_STATUSES, Passenger, RecordStatus, Trip, TripStatus
-from app.routers.admin_views import DONE
+from app.routers.admin_views import DONE, _live_trip
+from app.services.activity import km_by_day, ratings_by
 from app.services.audit import log_event
 from app.services.people_import import ImportFileError, parse_passenger_xlsx
 
@@ -118,13 +120,14 @@ def _driver_stats(db: Session, ids: list[int]) -> dict[int, dict]:
     return {d: {"total_trips": n, "total_km": int(km), "cancelled_trips": c, "last_trip_at": last} for d, n, km, c, last in rows}
 
 
-def driver_out(d: Driver, stats: dict | None, open_trip: Trip | None) -> dict:
+def driver_out(d: Driver, stats: dict | None, open_trip: Trip | None, rating: dict | None = None) -> dict:
     s = stats or {"total_trips": 0, "total_km": 0, "cancelled_trips": 0, "last_trip_at": None}
     return {
         "id": d.id, "employee_id": d.employee_id, "name": d.name, "phone": d.phone, "license_no": d.license_no,
         "status": d.status.value, "has_pin": d.pin_hash is not None, **s,
         "open_trip": None if open_trip is None else {"id": open_trip.id, "trip_no": open_trip.trip_no,
-                                                     "status": open_trip.status.value},
+                                                     "status": open_trip.status.value, "car_code": open_trip.vehicle.car_code},
+        "rating": rating,  # passengers' average stars, or null
         "created_at": d.created_at,
     }
 
@@ -142,7 +145,16 @@ def _get_driver(db: Session, driver_id: int, lock: bool = False) -> Driver:
 
 
 def _full_driver(db: Session, d: Driver) -> dict:
-    return driver_out(d, _driver_stats(db, [d.id]).get(d.id), _open_trip_of(db, d.id))
+    return driver_out(d, _driver_stats(db, [d.id]).get(d.id), _open_trip_of(db, d.id), ratings_by(db, Trip.driver_id, [d.id]).get(d.id))
+
+
+DRIVER_ID_RE = re.compile(r"^DR(\d+)$", re.I)
+
+
+def next_driver_id(db: Session) -> str:
+    """The next free driver ID in the DR9001 style."""
+    numbers = [int(m.group(1)) for e in db.scalars(select(Driver.employee_id)) if (m := DRIVER_ID_RE.match(e))]
+    return f"DR{max(numbers, default=9000) + 1}"
 
 
 @drivers.get("")
@@ -159,15 +171,21 @@ def list_drivers(
         where.append(Driver.employee_id.icontains(t, autoescape=True) | Driver.name.icontains(t, autoescape=True)
                      | Driver.phone.icontains(t, autoescape=True))
     rows = db.scalars(select(Driver).where(*where).order_by(Driver.name, Driver.id)).all()
-    stats = _driver_stats(db, [d.id for d in rows])
+    ids = [d.id for d in rows]
+    stats, ratings = _driver_stats(db, ids), ratings_by(db, Trip.driver_id, ids)
     open_trips = {t.driver_id: t for t in db.scalars(select(Trip).where(Trip.status.in_(OPEN_TRIP_STATUSES)))}
-    return {"total": len(rows), "drivers": [driver_out(d, stats.get(d.id), open_trips.get(d.id)) for d in rows]}
+    return {"total": len(rows), "next_employee_id": next_driver_id(db),
+            "drivers": [driver_out(d, stats.get(d.id), open_trips.get(d.id), ratings.get(d.id)) for d in rows]}
 
 
 @drivers.get("/{driver_id}")
 def driver_detail(driver_id: int, _: AdminUser = Depends(current_admin_user), db: Session = Depends(get_db)):
-    """The driver's trip history: GET /admin/trips?driver_id=."""
-    return {"driver": _full_driver(db, _get_driver(db, driver_id))}
+    """One driver with totals, last 10 trips and km per day (30 days). Full history: GET /admin/trips?driver_id=."""
+    d = _get_driver(db, driver_id)
+    last = db.scalars(select(Trip).where(Trip.driver_id == d.id).order_by(Trip.start_time.desc(), Trip.id.desc()).limit(10)).all()
+    now = datetime.now(timezone.utc)
+    return {"driver": _full_driver(db, d), "recent_trips": [_live_trip(t, now) for t in last],
+            "km_by_day": km_by_day(db, Trip.driver_id == d.id)}
 
 
 @drivers.post("", status_code=201)
@@ -178,7 +196,7 @@ def create_driver(
     """Add a driver. No PIN is set here: the driver chooses a 4-digit PIN at the first sign-in."""
     if _exists(db, Driver, body.employee_id):
         raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A driver with employee ID {body.employee_id} already exists")
-    d = Driver(employee_id=body.employee_id, name=body.name, phone=_clean(body.phone), license_no=_clean(body.license_no))
+    d = Driver(employee_id=body.employee_id.upper(), name=body.name, phone=_clean(body.phone), license_no=_clean(body.license_no))
     db.add(d)
     try:
         db.flush()
