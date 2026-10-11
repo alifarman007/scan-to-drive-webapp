@@ -112,7 +112,7 @@ def _who(t: Trip) -> tuple[str, str, str]:
     if t.is_visitor:
         return f"{t.visitor_name} (visitor)", "VISITOR", "Visitor"
     if t.passenger is not None:
-        return t.passenger.name, t.passenger.employee_id, t.passenger.department or "(no department)"
+        return t.passenger.name or t.passenger.employee_id, t.passenger.employee_id, t.passenger.department or "(no department)"
     return "(no passenger)", "", "(no passenger)"
 
 

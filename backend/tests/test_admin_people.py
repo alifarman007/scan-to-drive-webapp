@@ -159,16 +159,18 @@ def test_admin_adds_edits_and_deactivates_a_passenger(client, db):
     assert req(client, admin, "PATCH", "/passengers/999999", json={"name": "X"}).status_code == 404
 
 
-def test_inactive_passenger_is_not_found_on_the_passenger_page(client, db):
+def test_turned_off_passenger_cannot_confirm_on_the_passenger_page(client, db):
     admin = make_admin(db)
     car, driver = make_car(db), make_driver(db)
     raw = start(client, driver, car).json()["start_qr"]["url"].rsplit("/p/", 1)[1]
-    p = add_passenger(client, admin).json()["passenger"]
+    from tests.test_end_trip import emp_id
+    p = add_passenger(client, admin, employee_id=emp_id()).json()["passenger"]
     req(client, admin, "PATCH", f"/passengers/{p['id']}", json={"status": "inactive"})
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": p["employee_id"]})
-    assert r.status_code == 404 and r.json()["detail"]["code"] == "ID_NOT_FOUND"
+    body = {"passenger_type": "employee", "employee_id": p["employee_id"]}
+    r = client.post(f"/api/p/{raw}/confirm-start", json=body)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "PASSENGER_INACTIVE"
     req(client, admin, "PATCH", f"/passengers/{p['id']}", json={"status": "active"})
-    assert client.post(f"/api/p/{raw}/lookup", json={"employee_id": p["employee_id"]}).status_code == 200
+    assert client.post(f"/api/p/{raw}/confirm-start", json=body).status_code == 200
 
 
 def test_passenger_duplicates_and_checks(client, db):

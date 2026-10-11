@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, contains_eager
 from app.deps import current_admin_user, get_db, require_admin
 from app.errors import api_error
 from app.models import (
-    AdminUser, Alert, AlertStatus, Driver, OPEN_TRIP_STATUSES, Passenger, Trip, TripEvent, TripPhoto,
+    AdminUser, Alert, AlertStatus, Driver, OPEN_TRIP_STATUSES, Passenger, Trip, TripEvent, TripPhoto, TripReview,
     TripStage, TripStatus, Vehicle, VehicleStatus,
 )
 from app.routers.admin_alerts import alert_out
@@ -45,6 +45,8 @@ EVENT_LABELS = {
     "passenger_wrong_id": "Wrong ID entered",
     "qr_blocked": "QR blocked after too many wrong IDs",
     "alert_solved": "Alert marked as solved",
+    "trip_reviewed": "Passenger rated the trip",
+    "employee_ids_renamed": "Employee IDs renamed",
 }
 
 
@@ -65,18 +67,29 @@ def _live_trip(t: Trip, now: datetime) -> dict:
 def _who(db: Session, events: list[TripEvent]) -> dict[str, dict]:
     """Audit actors ("driver:EMP-1021", "passenger:EMP-2210", "admin:mary", "visitor:017...", "system") with a
     readable name, so the timeline says who did each step. One query per kind of person."""
+    # IDs renamed later (app/rename_ids.py): old audit lines keep the old ID, so look up the new one
+    renamed = {"driver": {}, "passenger": {}}
+    for detail in db.scalars(select(TripEvent.detail).where(TripEvent.event == "employee_ids_renamed")):
+        for kind, key in (("driver", "drivers"), ("passenger", "passengers")):
+            renamed[kind].update({old.upper(): new.upper() for old, new in (detail or {}).get(key, {}).items()})
+
+    def current(kind: str, ref: str) -> str:
+        """The ID as it is now: the new ID if it was renamed, otherwise the ID as written."""
+        return renamed.get(kind, {}).get(ref.upper(), ref)
+
     ids = {"driver": set(), "passenger": set()}
     for e in events:
         kind, _, ref = e.actor.partition(":")
         if kind in ids and ref and ref != "unknown":
-            ids[kind].add(ref.upper())
+            ids[kind].add(current(kind, ref).upper())
     names = {}
     if ids["driver"]:
         names.update({f"driver:{k}": v for k, v in db.execute(
             select(func.upper(Driver.employee_id), Driver.name).where(func.upper(Driver.employee_id).in_(ids["driver"]))).all()})
     if ids["passenger"]:
         names.update({f"passenger:{k}": v for k, v in db.execute(
-            select(func.upper(Passenger.employee_id), Passenger.name).where(func.upper(Passenger.employee_id).in_(ids["passenger"]))).all()})
+            select(func.upper(Passenger.employee_id), func.coalesce(Passenger.name, Passenger.employee_id))
+            .where(func.upper(Passenger.employee_id).in_(ids["passenger"]))).all()})
     out = {}
     for e in events:
         kind, _, ref = e.actor.partition(":")
@@ -85,9 +98,9 @@ def _who(db: Session, events: list[TripEvent]) -> dict[str, dict]:
         elif kind == "visitor":
             name = None  # the visitor's name is on the trip; the actor only holds the phone
         else:
-            name = names.get(f"{kind}:{ref.upper()}")
+            name = names.get(f"{kind}:{current(kind, ref).upper()}") if kind in ids else None
         out[e.actor] = {"kind": kind if kind in ("driver", "passenger", "visitor", "admin") else "system",
-                        "ref": None if ref in ("", "unknown") else ref, "name": name}
+                        "ref": None if ref in ("", "unknown") else current(kind, ref) if kind in ids else ref, "name": name}
     return out
 
 
@@ -158,8 +171,23 @@ def dashboard(_: AdminUser = Depends(current_admin_user), db: Session = Depends(
     ).all())
     days = [today.replace(day=1).fromordinal(today.replace(day=1).toordinal() + i) for i in range(today.day)]
 
+    avg, count = db.execute(
+        select(func.avg(TripReview.rating), func.count()).select_from(TripReview).join(Trip, Trip.id == TripReview.trip_id)
+        .where(TripReview.created_at >= month_start)).one()
+    per_star = dict(db.execute(
+        select(TripReview.rating, func.count()).where(TripReview.created_at >= month_start).group_by(TripReview.rating)).all())
+    recent_reviews = db.execute(
+        select(TripReview, Trip.trip_no, Trip.id, Driver.name).join(Trip, Trip.id == TripReview.trip_id)
+        .join(Driver, Driver.id == Trip.driver_id).order_by(TripReview.created_at.desc()).limit(3)).all()
+
     return {
         "as_of": now, "today": today.isoformat(), "cards": cards, "car_board": board,
+        "ratings": {
+            "average_this_month": None if avg is None else round(float(avg), 1), "count_this_month": count,
+            "stars_this_month": [per_star.get(n, 0) for n in range(1, 6)],  # how many 1-star ... 5-star ratings
+            "recent": [{"trip_id": tid, "trip_no": tn, "driver_name": dn, "rating": r.rating, "tags": list(r.tags or []),
+                        "comment": r.comment, "at": r.created_at} for r, tn, tid, dn in recent_reviews],
+        },
         "live_trips": [_live_trip(t, now) for t in open_trips],
         "alerts": [alert_out(a, tn, cc) for a, tn, cc in recent_alerts],
         "charts": {
@@ -233,8 +261,10 @@ def trip_history(
         .order_by(Trip.start_time.desc(), Trip.id.desc()).limit(limit).offset(offset)
     ).unique().all()
     now = datetime.now(timezone.utc)
+    ratings = dict(db.execute(select(TripReview.trip_id, TripReview.rating).where(
+        TripReview.trip_id.in_([t.id for t in rows]))).all()) if rows else {}
     return {"total": total, "total_km": int(total_km), "limit": limit, "offset": offset,
-            "trips": [_live_trip(t, now) for t in rows]}
+            "trips": [{**_live_trip(t, now), "rating": ratings.get(t.id)} for t in rows]}
 
 
 @router.get("/trips/{trip_id}")
@@ -268,6 +298,7 @@ def trip_detail(
     lock = None if stage is None else {
         "stage": stage.value, "locked": is_locked(db, t.id, stage), "tries_left": tries_left(db, t.id, stage)}
     approver = db.get(AdminUser, t.approved_by) if t.approved_by else None
+    review = db.scalar(select(TripReview).where(TripReview.trip_id == t.id))
     who = _who(db, events)
     row.update(
         driver={"id": t.driver.id, "employee_id": t.driver.employee_id, "name": t.driver.name, "phone": t.driver.phone},
@@ -285,6 +316,8 @@ def trip_detail(
         approved_by=t.approved_by,
         approved_by_name=approver.username if approver else None,
         lock=lock,
+        review=None if review is None else {
+            "rating": review.rating, "tags": list(review.tags or []), "comment": review.comment, "at": review.created_at},
     )
     return {
         "trip": row,

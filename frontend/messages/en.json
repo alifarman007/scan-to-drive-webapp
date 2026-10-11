@@ -18,15 +18,29 @@
     "backHome": "Back to start",
     "close": "Close"
   },
-  "home": {
-    "eyebrow": "Scan-to-Drive · Epic Group",
+  "welcome": {
+    "pageTitle": "Welcome",
+    "eyebrow": "Epic Group · Transport office",
     "title": "Every company trip, logged with one scan",
-    "lead": "Drivers scan the car, passengers confirm with their ID, and the transport office sees every trip live.",
-    "driver": "I am a driver",
-    "driverHint": "Sign in with your employee ID and PIN",
-    "admin": "Transport office",
-    "adminHint": "Dashboard, trips, cars and reports",
-    "passengerNote": "Passenger? Scan the QR code the driver shows you. No sign-in needed."
+    "lead": "Drivers scan the car, passengers confirm on their own phone, and the transport office sees every trip live.",
+    "adminSignIn": "Admin sign in",
+    "openDashboard": "Open the dashboard",
+    "adminHint": "For the transport office team.",
+    "signedInAs": "Signed in as {name}",
+    "stepLabel": "Step {n}",
+    "step1Title": "The driver scans the car",
+    "step1Body": "The QR sticker inside the car opens the trip: odometer photo, km and where to.",
+    "step2Title": "The passenger confirms",
+    "step2Body": "On their own phone: employee ID at the start, one tap at the end.",
+    "step3Title": "The office sees it live",
+    "step3Body": "Every car, trip, km and alert on one dashboard.",
+    "driverEyebrow": "Driver",
+    "driverTitle": "Scan the sticker in your car",
+    "driverBody": "Point your phone camera at the QR sticker. Sign in once, and you go straight to the trip.",
+    "driverSignedIn": "Signed in as {name} · My page",
+    "passengerEyebrow": "Passenger",
+    "passengerTitle": "Scan the driver's code",
+    "passengerBody": "The driver shows a QR code on their phone. Scan it with your camera. No sign-in, no app."
   },
   "placeholder": {
     "title": "This screen is being built",
@@ -73,7 +87,6 @@
     },
     "offline": "Connection lost · showing {time}",
     "refresh": "Refresh now",
-    "overtimeHint": "Hours beyond the shift and monthly totals, in the next phase.",
     "cards": {
       "onTrip": "Cars on a trip now",
       "available": "Cars free",
@@ -140,6 +153,15 @@
       "noTrips": "No trips this month yet.",
       "tripsCount": "{count, plural, one {# trip} other {# trips}}",
       "today": "Today"
+    },
+    "ratings": {
+      "title": "Passenger ratings",
+      "hint": "This month",
+      "average": "Average {avg} out of 5",
+      "count": "{count, plural, =0 {No ratings} one {# rating} other {# ratings}}",
+      "spread": "How the stars spread",
+      "emptyTitle": "No ratings yet",
+      "emptyBody": "Passengers can rate a trip right after they confirm the end."
     }
   },
   "styleguide": {
@@ -160,7 +182,7 @@
     "signInTitle": "Sign in",
     "signInLead": "Use your employee ID and 4-digit PIN. This phone keeps you signed in for 30 days.",
     "employeeId": "Employee ID",
-    "employeeIdPlaceholder": "e.g. EMP-6061",
+    "employeeIdPlaceholder": "e.g. DR9001",
     "pin": "4-digit PIN",
     "firstTimeHint": "First time? Type any 4 digits. You will choose your own PIN on the next screen.",
     "signIn": "Sign in",
@@ -333,8 +355,8 @@
     "startTitle": "Show this to your passenger",
     "endTitle": "Ask the passenger to confirm the end",
     "startBody": "They scan it with their phone camera and type their employee ID.",
-    "endBody": "They scan it and type the same employee ID as at the start.",
-    "endBodyVisitor": "They scan it and type the same phone number as at the start.",
+    "endBody": "They scan it with the same phone and confirm with one tap (on another phone: the same employee ID).",
+    "endBodyVisitor": "They scan it with the same phone and confirm with one tap (on another phone: the same phone number).",
     "blocked": "Blocked after too many wrong IDs. Ask the transport office to unlock it, or cancel.",
     "startCodeLabel": "Start · one-time code",
     "endCodeLabel": "End · one-time code",
@@ -431,12 +453,9 @@
     "employee": "Epic employee",
     "visitor": "Visitor",
     "yourId": "Your employee ID",
-    "idHint": "As on your ID card, for example EMP-1234.",
+    "idHint": "3 letters and 4 digits, as on your ID card. For example EMP2210.",
     "triesLeft": "{left, plural, one {# try left} other {# tries left}}",
-    "next": "Next",
-    "isThisYou": "Is this you?",
     "confirmStart": "Yes, start the trip",
-    "notMe": "Not me, change the ID",
     "visitorName": "Your name",
     "visitorNamePlaceholder": "Full name",
     "nameNeeded": "Please type your name.",
@@ -447,8 +466,7 @@
     "visitorReasonPlaceholder": "For example: factory visit",
     "startDoneTitle": "You're all set",
     "startDoneBody": "Thank you, {name}. Your trip has started.",
-    "atTheEnd": "When you arrive, the driver will show you another QR code. Scan it and type the same employee ID to confirm the end of the trip.",
-    "atTheEndVisitor": "When you arrive, the driver will show you another QR code. Scan it and type the same phone number to confirm the end of the trip.",
+    "atTheEnd": "The driver will show you the end QR. This phone is remembered, so confirming the end is one tap. Nothing to type.",
     "startedAt": "Started {time}",
     "canClose": "You can close this page.",
     "endEyebrow": "End of trip",
@@ -465,13 +483,10 @@
     "endPhoneHint": "The same number you gave at the start.",
     "confirmEnd": "Confirm end of trip",
     "endDoneTitle": "Trip complete",
-    "endDoneBody": "Thank you for confirming. Have a good day.",
     "endedAt": "Ended {time}",
     "errors": {
       "generic": "Something went wrong. Please try again.",
       "network": "No connection. Check Wi-Fi or mobile data and try again.",
-      "idNotFound": "We could not find this employee ID. Check it and try again.",
-      "idNotFoundLeft": "We could not find this employee ID. {left, plural, one {# try left} other {# tries left}}.",
       "mismatch": "This ID does not match the passenger who started the trip.",
       "mismatchLeft": "This ID does not match the passenger who started the trip. {left, plural, one {# try left} other {# tries left}}.",
       "phoneMismatch": "This number does not match the one given at the start.",
@@ -481,7 +496,9 @@
       "VISITORS_NOT_ALLOWED": "Visitors cannot be confirmed here. Please ask the transport office.",
       "WRONG_PASSENGER_TYPE": "This trip was started by a different kind of passenger. Ask the driver to check.",
       "checkFields": "Please check what you typed.",
-      "NAME_REQUIRED": "Please type your name."
+      "NAME_REQUIRED": "Please type your name.",
+      "BAD_ID_FORMAT": "That doesn't look like an employee ID. It is 3 letters and 4 digits, like EMP2210.",
+      "PASSENGER_INACTIVE": "This employee ID is turned off. Please ask the transport office."
     },
     "dead": {
       "QR_INVALID": {
@@ -494,7 +511,7 @@
       },
       "QR_USED": {
         "title": "This code has already been used",
-        "body": "The trip was already confirmed with this code. Nothing more to do, you can close this page."
+        "body": "The trip was already confirmed with this code. Nothing more to do here."
       },
       "TRIP_CANCELLED": {
         "title": "This trip was cancelled",
@@ -516,10 +533,6 @@
         "title": "This trip is not waiting for you",
         "body": "The trip has moved on (it may already be confirmed or closed). You can close this page."
       },
-      "TOO_MANY_LOOKUPS": {
-        "title": "Too many tries",
-        "body": "Please wait a few minutes before trying again, or ask the driver to contact the transport office."
-      },
       "OFFLINE": {
         "title": "Can't reach the server",
         "body": "Check your internet connection and open the link again."
@@ -530,7 +543,58 @@
       }
     },
     "identifyNote": "The start of this trip was not confirmed, so please tell us who you are. This confirms the end of the trip.",
-    "phoneHintEnd": "So the transport office can reach you about this trip if needed."
+    "phoneHintEnd": "So the transport office can reach you about this trip if needed.",
+    "idLooksRight": "Looks right",
+    "yourName": "Your name (optional)",
+    "yourNameHint": "Helps the transport office if they need to reach you.",
+    "atTheEndTitle": "When you arrive",
+    "orScanLater": "Or close this page and scan the end QR with your phone camera later.",
+    "scanEnd": "Scan the end QR",
+    "scanEndTitle": "Scan the end QR",
+    "scanEndHint": "Point at the QR code on the driver's phone. It reads by itself.",
+    "scanEndNotOurs": "That is not a Scan-to-Drive trip code. Scan the code on the driver's phone.",
+    "onTripNow": "You are on a trip in {car}. When you arrive, scan the end QR from here.",
+    "samePhone": "This phone started the trip",
+    "oneTapNote": "Nothing to type. Just confirm.",
+    "notYouType": "Not you? Type the employee ID instead",
+    "forgotten": "This phone is not remembered any more. Type the same employee ID as at the start.",
+    "forgottenVisitor": "This phone is not remembered any more. Type the same phone number as at the start.",
+    "review": {
+      "title": "How was your ride?",
+      "withDriver": "With {driver}",
+      "starsLabel": "Your rating",
+      "stars": "{n, plural, one {# star} other {# stars}}",
+      "tapAStar": "Tap a star",
+      "word1": "Poor",
+      "word2": "Not great",
+      "word3": "Okay",
+      "word4": "Good",
+      "word5": "Excellent!",
+      "wentWell": "What went well?",
+      "couldBeBetter": "What could be better?",
+      "commentLabel": "Comment",
+      "commentPlaceholder": "Anything else? (optional)",
+      "skip": "Skip",
+      "send": "Send",
+      "private": "Only the transport office sees this.",
+      "thanksTitle": "Thank you!",
+      "thanksBody": "Your feedback helps keep every ride safe and on time.",
+      "skipped": "No problem. Have a good day!",
+      "expired": "This rating link has expired.",
+      "failed": "Could not send. Please try again."
+    }
+  },
+  "reviewTags": {
+    "safe_driving": "Safe driving",
+    "on_time": "On time",
+    "clean_car": "Clean car",
+    "polite_driver": "Polite driver",
+    "smooth_ride": "Smooth ride",
+    "rough_driving": "Rough driving",
+    "late": "Late",
+    "dirty_car": "Dirty car",
+    "impolite": "Impolite",
+    "phone_while_driving": "Phone while driving"
   },
   "adminAuth": {
     "pageTitle": "Transport office sign in",
@@ -549,7 +613,7 @@
     "signIn": "Sign in",
     "welcome": "Welcome",
     "sessionNote": "You stay signed in for 8 hours on this computer. Sign out when you leave a shared computer.",
-    "driverLink": "Are you a driver? Driver sign in",
+    "driverNote": "Driver? Scan the QR sticker in your car.",
     "errWrong": "Username or password is not correct.",
     "errLocked": "Too many wrong tries. Wait 15 minutes, or ask another admin to check your account.",
     "errEmpty": "Type your username and password.",
@@ -624,7 +688,8 @@
       "filteredBody": "Try fewer filters or another date range.",
       "clear": "Clear filters"
     },
-    "fromPlace": "from {place}"
+    "fromPlace": "from {place}",
+    "rated": "Rated {rating} out of 5"
   },
   "tripDetail": {
     "back": "Trip history",
@@ -690,7 +755,10 @@
       "unknownPassenger": "Did not confirm",
       "noPassenger": "No passenger",
       "purpose": "Purpose: {purpose}",
-      "visitorReason": "Reason: {reason}"
+      "visitorReason": "Reason: {reason}",
+      "noNameGiven": "No name given",
+      "rating": "Passenger rating",
+      "notRated": "The passenger did not rate this trip"
     },
     "journey": {
       "title": "Journey",
@@ -774,7 +842,9 @@
         "note": "Note: {text}",
         "stage": "{stage}",
         "identifiedAtEnd": "Said who they are at the end (the start was not confirmed)",
-        "visitor": "Visitor: {name}"
+        "visitor": "Visitor: {name}",
+        "samePhone": "Same phone as at the start (one tap)",
+        "rating": "{rating} of 5 stars"
       },
       "events": {
         "trip_started": "Trip started",
@@ -793,7 +863,8 @@
         "passenger_lookup": "Passenger checked an ID",
         "passenger_wrong_id": "Wrong ID typed",
         "qr_blocked": "QR blocked",
-        "alert_solved": "Alert solved"
+        "alert_solved": "Alert solved",
+        "trip_reviewed": "Passenger rated the trip"
       }
     }
   },

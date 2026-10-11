@@ -226,7 +226,7 @@ function MoreSheet({ open, onOpenChange, user }: { open: boolean; onOpenChange: 
   const items = [...MAIN_NAV, ...FOOT_NAV].filter((n) => !["dashboard", "trips", "alerts"].includes(n.key));
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title={t("dock.moreTitle")}>
-      <ul className="grid grid-cols-3 gap-2">
+      <ul className="grid grid-cols-2 gap-2">
         {items.map((item, i) => {
           const Icon = item.icon;
           const active = isActive(pathname, item.href);
@@ -237,7 +237,7 @@ function MoreSheet({ open, onOpenChange, user }: { open: boolean; onOpenChange: 
                 onClick={() => onOpenChange(false)}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex aspect-[1/0.92] flex-col items-center justify-center gap-2 rounded-2xl px-1 text-center text-xs font-semibold transition-colors active:scale-[0.97]",
+                  "relative flex h-[4.25rem] items-center gap-3 rounded-2xl px-4 text-left text-sm font-semibold transition-colors active:scale-[0.97]",
                   active ? "bg-navy text-white" : "bg-soft text-title",
                 )}
               >

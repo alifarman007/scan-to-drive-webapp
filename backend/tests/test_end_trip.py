@@ -21,6 +21,12 @@ def _uid() -> str:
     return uuid.uuid4().hex[:8]
 
 
+def emp_id() -> str:
+    """A random employee ID in the agreed shape (3 letters + 4 digits), e.g. TQX4821."""
+    import random
+    return "T" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ", k=2)) + f"{random.randint(0, 9999):04d}"
+
+
 @pytest.fixture()
 def client(db, tmp_path):
     storage = LocalStorage(tmp_path)
@@ -33,7 +39,7 @@ def client(db, tmp_path):
 
 
 def make_passenger(db, name="Nadia Islam"):
-    p = Passenger(employee_id=f"EMP-{_uid()}", name=name)
+    p = Passenger(employee_id=emp_id(), name=name)
     db.add(p)
     db.flush()
     return p
@@ -41,6 +47,14 @@ def make_passenger(db, name="Nadia Islam"):
 
 def set_setting(db, key, value):
     db.merge(Setting(key=key, value=str(value)))
+    db.flush()
+
+
+def lock_stage(db, trip_id, stage="start", tries=5):
+    """Mark a trip's QR stage as blocked, as if the passenger had typed `tries` wrong IDs."""
+    from sqlalchemy import update
+    from app.models import TripToken
+    db.execute(update(TripToken).where(TripToken.trip_id == trip_id, TripToken.kind == stage).values(failed_attempts=tries))
     db.flush()
 
 
@@ -228,7 +242,6 @@ def test_start_and_end_qr_cannot_be_swapped(client, db):
     end_raw = token_of(end(client, d2, trip2).json()["end_qr"])
     r = client.post(f"/api/p/{end_raw}/confirm-start", json={"passenger_type": "employee", "employee_id": p2.employee_id})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "WRONG_QR"
-    assert client.post(f"/api/p/{end_raw}/lookup", json={"employee_id": p2.employee_id}).status_code == 409
 
 
 # ---- passenger confirms the end (P4/S7) ----------------------------------------------------------

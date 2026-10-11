@@ -1,18 +1,22 @@
 "use client";
 
-import { WarningCircleIcon } from "@phosphor-icons/react";
+import { FlagCheckeredIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
+import { Card } from "@/components/ui/card";
+
 import { Reveal } from "@/components/ui/reveal";
-import { passengerApi, type StartConfirmed, type StartPage } from "@/lib/passenger-api";
+import { openTripOnThisPhone, passengerApi, type StartConfirmed, type StartPage } from "@/lib/passenger-api";
 
 import { EmployeeForm, SlideSwap, VisitorForm, WhoPicker, type Mode } from "./identity-forms";
 import { CodeTimer, DeadCode, PhotoButton, SuccessMark, TripCard } from "./pieces";
+import { ScanEndButton } from "./scan-end";
 
 /**
  * Start QR page (PDF 6.2 P1-P2): the passenger sees the trip, says who they are, and confirms the start.
- * Employee: type the ID, see your NAME to check for typos, then confirm. Visitor: name, phone, optional reason.
+ * Employee: the ID (and a name if they like). Visitor: name, phone, optional reason.
+ * This phone is then remembered for the trip, so the end is one tap.
  */
 export function StartFlow({ token, page }: { token: string; page: StartPage }) {
   const t = useTranslations("passenger");
@@ -20,6 +24,11 @@ export function StartFlow({ token, page }: { token: string; page: StartPage }) {
   const [dead, setDead] = useState<string | null>(null);
   const [done, setDone] = useState<StartConfirmed["trip"] | null>(null);
   const onExpired = useCallback(() => setDead((d) => d ?? "QR_EXPIRED"), []);
+
+  const started = useCallback((trip: StartConfirmed["trip"]) => {
+    openTripOnThisPhone.set(trip);
+    setDone(trip);
+  }, []);
 
   if (done) return <StartDone trip={done} />;
   if (dead) return <DeadCode code={dead} />;
@@ -58,18 +67,18 @@ export function StartFlow({ token, page }: { token: string; page: StartPage }) {
           <SlideSwap mode={mode}>
             {mode === "employee" ? (
               <EmployeeForm
-                token={token}
+                idPattern={page.id_pattern}
                 triesLeft={page.tries_left}
-                confirm={(id) => passengerApi.confirmEmployee(token, id).then((r) => r.trip)}
+                confirm={(e) => passengerApi.confirmEmployee(token, e).then((r) => r.trip)}
                 confirmLabel={t("confirmStart")}
-                onDone={setDone}
+                onDone={started}
                 onDead={setDead}
               />
             ) : (
               <VisitorForm
                 confirm={(v) => passengerApi.confirmVisitor(token, v).then((r) => r.trip)}
                 confirmLabel={t("confirmStart")}
-                onDone={setDone}
+                onDone={started}
                 onDead={setDead}
               />
             )}
@@ -101,12 +110,22 @@ function StartDone({ trip }: { trip: StartConfirmed["trip"] }) {
         />
       </Reveal>
       <Reveal delay={0.4}>
-        <p className="rounded-2xl bg-soft px-4 py-3.5 text-left text-sm text-title">
-          {trip.is_visitor ? t("atTheEndVisitor") : t("atTheEnd")}
-        </p>
+        <Card className="flex flex-col gap-4 border-0 p-5 text-left shadow-lift">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex size-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-accent">
+              <FlagCheckeredIcon size={22} weight="duotone" />
+            </span>
+            <div className="flex flex-col gap-1">
+              <h2 className="font-display text-lg font-bold text-title">{t("atTheEndTitle")}</h2>
+              <p className="text-sm text-muted">{t("atTheEnd")}</p>
+            </div>
+          </div>
+          <ScanEndButton />
+          <p className="text-center text-xs text-muted">{t("orScanLater")}</p>
+        </Card>
       </Reveal>
       <p className="text-xs text-muted">
-        {t("startedAt", { time: format.dateTime(new Date(trip.journey_start_time), { hour: "numeric", minute: "2-digit" }) })} · {t("canClose")}
+        {t("startedAt", { time: format.dateTime(new Date(trip.journey_start_time), { hour: "numeric", minute: "2-digit" }) })}
       </p>
     </div>
   );

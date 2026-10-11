@@ -16,6 +16,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -147,6 +148,9 @@ class Trip(Base):
     approved_by: Mapped[int | None] = mapped_column(ForeignKey("admin_users.id"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approval_note: Mapped[str | None] = mapped_column(Text)
+    # The passenger's phone is remembered after the start (a cookie holds the key, only its hash is here),
+    # so the same phone can confirm the end with one tap.
+    passenger_key_hash: Mapped[str | None] = mapped_column(String(64))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
@@ -154,6 +158,25 @@ class Trip(Base):
     vehicle: Mapped[Vehicle] = relationship()
     driver: Mapped[Driver] = relationship()
     passenger: Mapped[Passenger | None] = relationship()
+
+
+class TripReview(Base):
+    """The passenger's rating after the trip: 1-5 stars, quick tags, an optional comment. One per trip."""
+
+    __tablename__ = "trip_reviews"
+    __table_args__ = (
+        CheckConstraint("rating BETWEEN 1 AND 5", name="rating_1_to_5"),
+        Index("ix_trip_reviews_created_at", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id"), unique=True)
+    rating: Mapped[int] = mapped_column(Integer)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(String(30)), server_default=text("'{}'"))
+    comment: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class TripPhoto(Base):

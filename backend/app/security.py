@@ -73,3 +73,39 @@ def sign_photo_link(trip_id: int, kind: str, seconds: int = PHOTO_LINK_SECONDS) 
 
 def photo_link_valid(trip_id: int, kind: str, exp: int, sig: str) -> bool:
     return exp >= _time.time() and hmac.compare_digest(_photo_sig(trip_id, kind, exp), sig)
+
+
+# ---- passenger page: remembered phone, review link ------------------------------------------------------------
+
+PASSENGER_COOKIE_DAYS = 2  # long enough for any trip
+REVIEW_SECONDS = 2 * 3600  # the review can be sent up to 2 hours after confirming the end
+
+
+def passenger_cookie_name(trip_id: int) -> str:
+    """One cookie per trip, so a phone used for several trips remembers each of them."""
+    return f"s2d_pax{trip_id}"
+
+
+def hash_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _review_sig(trip_id: int, exp: int) -> str:
+    return hmac.new(settings.secret_key.encode(), f"review:{trip_id}:{exp}".encode(), hashlib.sha256).hexdigest()
+
+
+def sign_review_token(trip_id: int) -> str:
+    exp = int(_time.time()) + REVIEW_SECONDS
+    return f"{trip_id}.{exp}.{_review_sig(trip_id, exp)}"
+
+
+def review_token_trip(token: str) -> int | None:
+    """The trip id inside a valid, unexpired review token, else None."""
+    try:
+        trip_id, exp, sig = token.split(".")
+        trip_id_i, exp_i = int(trip_id), int(exp)
+    except ValueError:
+        return None
+    if exp_i < _time.time() or not hmac.compare_digest(_review_sig(trip_id_i, exp_i), sig):
+        return None
+    return trip_id_i

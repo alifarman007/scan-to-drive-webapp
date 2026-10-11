@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleNotchIcon, FlagCheckeredIcon, InfoIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, CircleNotchIcon, DeviceMobileIcon, FlagCheckeredIcon, InfoIcon, WarningCircleIcon } from "@phosphor-icons/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
 import { useCallback, useState } from "react";
 
@@ -8,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/input";
 import { Odometer } from "@/components/ui/odometer";
-import { Reveal, Stagger, StaggerItem } from "@/components/ui/reveal";
-import { PHONE_RE, passengerApi, type EndConfirmed, type EndPage } from "@/lib/passenger-api";
+import { Reveal } from "@/components/ui/reveal";
+import { ApiError } from "@/lib/api";
+import { PHONE_RE, cleanId, openTripOnThisPhone, passengerApi, type EndConfirmed, type EndPage } from "@/lib/passenger-api";
 
 import { EmployeeForm, SlideSwap, VisitorForm, WhoPicker, type Mode } from "./identity-forms";
 import { CodeTimer, DeadCode, ErrorText, PhotoButton, Shake, SuccessMark, TripCard, useErrorText } from "./pieces";
+import { ReviewCard } from "./review";
 
 /** Km in the digits printed on the car's odometer, also in Bangla. */
 const LATIN = { numberingSystem: "latn" } as const;
@@ -29,16 +32,23 @@ function useMinutes() {
 
 /**
  * End QR page (PDF 6.2 P3-P4): the passenger checks the finished trip (km, distance, time, both dashboard
- * photos) and confirms with the SAME employee ID as at the start, or the same phone number for a visitor.
+ * photos) and confirms. The phone that confirmed the start does it with one tap; another phone types the SAME
+ * employee ID as at the start (or the same phone number for a visitor). Then: rate the ride.
  */
 export function EndFlow({ token, page }: { token: string; page: EndPage }) {
   const t = useTranslations("passenger");
   const [dead, setDead] = useState<string | null>(null);
-  const [done, setDone] = useState<EndConfirmed["trip"] | null>(null);
+  const [done, setDone] = useState<EndConfirmed | null>(null);
+  // the remembered phone can still choose to type the ID (or has to, if the browser forgot it meanwhile)
+  const [typing, setTyping] = useState<"no" | "chosen" | "forgotten">("no");
   const onExpired = useCallback(() => setDead((d) => d ?? "QR_EXPIRED"), []);
+  const finished = useCallback((res: EndConfirmed) => {
+    openTripOnThisPhone.clear();
+    setDone(res);
+  }, []);
   const { trip } = page;
 
-  if (done) return <EndDone trip={done} />;
+  if (done) return <EndDone result={done} />;
   if (dead) return <DeadCode code={dead} />;
 
   return (
@@ -79,11 +89,40 @@ export function EndFlow({ token, page }: { token: string; page: EndPage }) {
         </Reveal>
       ) : page.identify ? (
         <Reveal delay={0.14}>
-          <IdentifyAtEnd token={token} page={page} onDone={setDone} onDead={setDead} />
+          <IdentifyAtEnd token={token} page={page} onDone={finished} onDead={setDead} />
         </Reveal>
       ) : (
         <Reveal delay={0.14}>
-          <EndForm token={token} as={page.confirm_as} triesLeft={page.tries_left} onDone={setDone} onDead={setDead} />
+          <AnimatePresence mode="wait" initial={false}>
+            {page.remembered && typing === "no" ? (
+              <motion.div key="tap" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
+                <OneTapEnd
+                  token={token}
+                  you={page.you}
+                  onDone={finished}
+                  onDead={setDead}
+                  onType={(why) => setTyping(why)}
+                />
+              </motion.div>
+            ) : (
+              <motion.div key="type" initial={page.remembered ? { opacity: 0, y: 10 } : false} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4">
+                {typing === "forgotten" ? (
+                  <p className="flex items-start gap-2.5 rounded-2xl bg-wait-bg px-4 py-3.5 text-sm font-semibold text-wait-fg">
+                    <InfoIcon size={20} weight="fill" className="mt-px shrink-0" />
+                    {page.confirm_as === "visitor" ? t("forgottenVisitor") : t("forgotten")}
+                  </p>
+                ) : null}
+                <EndForm
+                  token={token}
+                  as={page.confirm_as}
+                  triesLeft={page.tries_left}
+                  focus={typing !== "no"}
+                  onDone={finished}
+                  onDead={setDead}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Reveal>
       )}
     </div>
@@ -102,7 +141,7 @@ function IdentifyAtEnd({
 }: {
   token: string;
   page: EndPage;
-  onDone: (trip: EndConfirmed["trip"]) => void;
+  onDone: (result: EndConfirmed) => void;
   onDead: (code: string) => void;
 }) {
   const t = useTranslations("passenger");
@@ -117,16 +156,16 @@ function IdentifyAtEnd({
       <SlideSwap mode={mode}>
         {mode === "employee" ? (
           <EmployeeForm
-            token={token}
+            idPattern={page.id_pattern}
             triesLeft={page.tries_left}
-            confirm={(id) => passengerApi.confirmEnd(token, "employee", id).then((r) => r.trip)}
+            confirm={(e) => passengerApi.identifyEmployeeAtEnd(token, e)}
             confirmLabel={t("confirmEnd")}
             onDone={onDone}
             onDead={onDead}
           />
         ) : (
           <VisitorForm
-            confirm={(v) => passengerApi.identifyVisitorAtEnd(token, v).then((r) => r.trip)}
+            confirm={(v) => passengerApi.identifyVisitorAtEnd(token, v)}
             confirmLabel={t("confirmEnd")}
             phoneHint={t("phoneHintEnd")}
             onDone={onDone}
@@ -170,13 +209,16 @@ function EndForm({
   token,
   as,
   triesLeft,
+  focus = false,
   onDone,
   onDead,
 }: {
   token: string;
   as: EndPage["confirm_as"];
   triesLeft: number;
-  onDone: (trip: EndConfirmed["trip"]) => void;
+  /** put the cursor in the box straight away (the remembered phone chose, or had, to type) */
+  focus?: boolean;
+  onDone: (result: EndConfirmed) => void;
   onDead: (code: string) => void;
 }) {
   const t = useTranslations("passenger");
@@ -205,7 +247,7 @@ function EndForm({
     try {
       const res = await passengerApi.confirmEnd(token, as, value.trim());
       navigator.vibrate?.(40);
-      onDone(res.trip);
+      onDone(res);
     } catch (err) {
       setError(errorText(err, onDead));
       setShake((n) => n + 1);
@@ -220,19 +262,20 @@ function EndForm({
           <Input
             id="end-value"
             mono
+            autoFocus={focus}
             autoComplete={isPhone ? "tel" : "off"}
             autoCapitalize={isPhone ? undefined : "characters"}
             spellCheck={false}
             type={isPhone ? "tel" : "text"}
             inputMode={isPhone ? "tel" : "text"}
-            placeholder={isPhone ? "01XXX XXXXXX" : "EMP-0000"}
+            placeholder={isPhone ? "01XXX XXXXXX" : "EMP2210"}
             value={value}
             onChange={(e) => {
-              setValue(e.target.value);
+              setValue(isPhone ? e.target.value : cleanId(e.target.value));
               setError(null);
             }}
             invalid={Boolean(error || formatError)}
-            maxLength={isPhone ? 21 : 40}
+            maxLength={isPhone ? 21 : 20}
           />
         </Field>
       </Shake>
@@ -251,43 +294,112 @@ function EndForm({
   );
 }
 
-function EndDone({ trip }: { trip: EndConfirmed["trip"] }) {
+/**
+ * The phone that confirmed the start: who is confirming, and one big button. Nothing to type.
+ * If the browser forgot this phone in the meantime, the page falls back to typing the ID.
+ */
+function OneTapEnd({
+  token,
+  you,
+  onDone,
+  onDead,
+  onType,
+}: {
+  token: string;
+  you: string | null;
+  onDone: (result: EndConfirmed) => void;
+  onDead: (code: string) => void;
+  onType: (why: "chosen" | "forgotten") => void;
+}) {
+  const t = useTranslations("passenger");
+  const errorText = useErrorText();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirm() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await passengerApi.confirmEndRemembered(token);
+      navigator.vibrate?.(40);
+      onDone(res);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "NOT_REMEMBERED") return onType("forgotten");
+      setError(errorText(err, onDead));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3 rounded-card border-[1.5px] border-ok-dot/35 bg-ok-bg p-4">
+        <span className="relative inline-flex size-12 shrink-0 items-center justify-center rounded-2xl bg-ok-dot text-white">
+          <DeviceMobileIcon size={24} weight="duotone" />
+          <motion.span
+            className="absolute inset-0 rounded-2xl ring-2 ring-ok-dot"
+            initial={{ scale: 1, opacity: 0.8 }}
+            animate={{ scale: 1.35, opacity: 0 }}
+            transition={{ duration: 1.4, repeat: 2, ease: "easeOut", delay: 0.5 }}
+          />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <span className="text-xs font-semibold text-ok-fg">{t("samePhone")}</span>
+          {you ? <span className="truncate font-display text-lg font-bold text-ok-fg">{you}</span> : null}
+          <span className="text-sm text-ok-fg/85">{t("oneTapNote")}</span>
+        </div>
+      </div>
+      <ErrorText text={error} />
+      <Button size="xl" lift onClick={() => void confirm()} disabled={busy} aria-busy={busy}>
+        {busy ? (
+          <CircleNotchIcon size={22} className="animate-spin" />
+        ) : (
+          <>
+            <FlagCheckeredIcon size={22} weight="bold" />
+            {t("confirmEnd")}
+          </>
+        )}
+      </Button>
+      <button
+        type="button"
+        onClick={() => onType("chosen")}
+        disabled={busy}
+        className="mx-auto inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold text-accent hover:underline disabled:opacity-50"
+      >
+        {t("notYouType")}
+        <ArrowRightIcon size={14} weight="bold" />
+      </button>
+    </div>
+  );
+}
+
+/** Done: a tick, the trip in one line, then "How was your ride?". */
+function EndDone({ result }: { result: EndConfirmed }) {
   const t = useTranslations("passenger");
   const format = useFormatter();
   const duration = useMinutes();
+  const { trip } = result;
   return (
     <div className="flex flex-col gap-5 pt-4 text-center">
       <SuccessMark />
-      <Reveal delay={0.2} className="flex flex-col gap-1.5">
+      <Reveal delay={0.2} className="flex flex-col items-center gap-2">
         <h1 className="font-display text-3xl font-bold text-title">{t("endDoneTitle")}</h1>
-        <p className="text-muted">{t("endDoneBody")}</p>
+        <p className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-muted">
+          <span className="font-display text-base font-bold text-title">{format.number(trip.distance_km, LATIN)} km</span>
+          <span aria-hidden="true">·</span>
+          <span>{duration(trip.journey_minutes)}</span>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono">{trip.car_code}</span>
+        </p>
       </Reveal>
-      <Reveal delay={0.3}>
-        <Card className="flex flex-col items-center gap-2 border-0 p-5 shadow-lift">
-          <span className="text-sm font-semibold text-muted">{t("odometer")}</span>
-          <Odometer value={trip.end_km} from={trip.start_km} size="lg" unit="km" />
-        </Card>
+      <Reveal delay={0.32}>
+        <ReviewCard token={result.review_token} driver={trip.driver_name} />
       </Reveal>
-      <Stagger className="grid grid-cols-2 gap-3 text-left">
-        <StaggerItem>
-          <Card className="flex h-full flex-col gap-1 p-4">
-            <span className="text-xs font-bold tracking-wide text-muted uppercase">{t("distance")}</span>
-            <span className="font-display text-2xl font-bold text-title">{format.number(trip.distance_km, LATIN)} km</span>
-          </Card>
-        </StaggerItem>
-        <StaggerItem>
-          <Card className="flex h-full flex-col gap-1 p-4">
-            <span className="text-xs font-bold tracking-wide text-muted uppercase">{t("journeyTime")}</span>
-            <span className="font-display text-2xl font-bold text-title">{duration(trip.journey_minutes)}</span>
-          </Card>
-        </StaggerItem>
-      </Stagger>
       <p className="text-xs text-muted">
-        <span className="font-mono">
-          {trip.trip_no} · {trip.car_code}
-        </span>
+        <span className="font-mono">{trip.trip_no}</span> ·{" "}
+        {t("endedAt", { time: format.dateTime(new Date(trip.end_confirm_time), { hour: "numeric", minute: "2-digit" }) })}
         <br />
-        {t("endedAt", { time: format.dateTime(new Date(trip.end_confirm_time), { hour: "numeric", minute: "2-digit" }) })} · {t("canClose")}
+        {t("canClose")}
       </p>
     </div>
   );

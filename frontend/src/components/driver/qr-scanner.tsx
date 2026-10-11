@@ -45,7 +45,9 @@ export function ScanCarButton() {
       <QrScanner
         open={open}
         onOpenChange={setOpen}
-        onCar={(code, v) => router.push(`/c/${encodeURIComponent(code)}${v ? `?v=${v}` : ""}`)}
+        read={parseCarSticker}
+        onFound={(car) => router.push(`/c/${encodeURIComponent(car.code)}${car.v ? `?v=${car.v}` : ""}`)}
+        typeLabel={t("typeInstead")}
         onTypeCode={() => {
           setOpen(false);
           setTimeout(() => document.getElementById("car-code")?.focus(), 250);
@@ -55,21 +57,29 @@ export function ScanCarButton() {
   );
 }
 
+type ScannerProps<T> = {
+  /** turns what the camera read into something we accept (a car sticker, a trip code), or null */
+  read: (text: string) => T | null;
+  onFound: (value: T) => void;
+  /** defaults: the car sticker texts */
+  title?: string;
+  hint?: string;
+  notOurs?: string;
+  /** optional button at the bottom ("Type the car code instead") */
+  typeLabel?: string;
+  onTypeCode?: () => void;
+};
+
 /**
- * Full-screen camera that reads a car's QR sticker. Uses the browser's own QR reader when there is one,
- * otherwise jsQR on a small crop of the frame (works on every phone). Only our car stickers are accepted.
+ * Full-screen camera that reads a QR code. Uses the browser's own QR reader when there is one, otherwise jsQR
+ * on a small crop of the frame (works on every phone). Only codes that `read` accepts are taken; anything else
+ * gets a short "that is not one of ours" note. Used for car stickers (driver) and the end QR (passenger).
  */
-export function QrScanner({
+export function QrScanner<T>({
   open,
   onOpenChange,
-  onCar,
-  onTypeCode,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCar: (code: string, v: string | null) => void;
-  onTypeCode: () => void;
-}) {
+  ...props
+}: ScannerProps<T> & { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useTranslations("scanner");
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -84,8 +94,8 @@ export function QrScanner({
                 exit={{ opacity: 0, scale: 1.04 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
-                <Dialog.Title className="sr-only">{t("title")}</Dialog.Title>
-                <ScannerBody onCar={onCar} onTypeCode={onTypeCode} />
+                <Dialog.Title className="sr-only">{props.title ?? t("title")}</Dialog.Title>
+                <ScannerBody {...props} />
               </motion.div>
             </Dialog.Content>
           </Dialog.Portal>
@@ -95,13 +105,7 @@ export function QrScanner({
   );
 }
 
-function ScannerBody({
-  onCar,
-  onTypeCode,
-}: {
-  onCar: (code: string, v: string | null) => void;
-  onTypeCode: () => void;
-}) {
+function ScannerBody<T>({ read, onFound, title, hint, notOurs: notOursText, typeLabel, onTypeCode }: ScannerProps<T>) {
   const t = useTranslations("scanner");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -109,10 +113,12 @@ function ScannerBody({
   const [torch, setTorch] = useState<{ available: boolean; on: boolean }>({ available: false, on: false });
   const [notOurs, setNotOurs] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // the latest callback, without restarting the camera when the parent re-renders
-  const onCarRef = useRef(onCar);
+  // the latest callbacks, without restarting the camera when the parent re-renders
+  const readRef = useRef(read);
+  const onFoundRef = useRef(onFound);
   useEffect(() => {
-    onCarRef.current = onCar;
+    readRef.current = read;
+    onFoundRef.current = onFound;
   });
 
   const stop = useCallback(() => {
@@ -206,13 +212,13 @@ function ScannerBody({
         }
         if (cancelled) return;
         if (text) {
-          const car = parseCarSticker(text);
-          if (car) {
+          const value = readRef.current(text);
+          if (value !== null) {
             setPhase("found");
             navigator.vibrate?.(40);
             timer = setTimeout(() => {
               stop();
-              onCarRef.current(car.code, car.v);
+              onFoundRef.current(value);
             }, 550);
             return;
           }
@@ -307,7 +313,7 @@ function ScannerBody({
 
       {/* top bar */}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))]">
-        <p className="font-display text-lg font-semibold drop-shadow">{t("title")}</p>
+        <p className="font-display text-lg font-semibold drop-shadow">{title ?? t("title")}</p>
         <Dialog.Close asChild>
           <button
             type="button"
@@ -329,7 +335,7 @@ function ScannerBody({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
           >
-            {t("notOurs")}
+            {notOursText ?? t("notOurs")}
           </motion.p>
         ) : null}
       </AnimatePresence>
@@ -357,7 +363,7 @@ function ScannerBody({
 
       {/* bottom bar */}
       <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        {!failed ? <p className="text-center text-sm text-white/85 drop-shadow">{phase === "starting" ? t("starting") : t("hint")}</p> : null}
+        {!failed ? <p className="text-center text-sm text-white/85 drop-shadow">{phase === "starting" ? t("starting") : (hint ?? t("hint"))}</p> : null}
         <div className="flex items-center gap-3">
           {torch.available ? (
             <button
@@ -373,14 +379,16 @@ function ScannerBody({
               <FlashlightIcon size={26} weight={torch.on ? "fill" : "regular"} />
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onTypeCode}
-            className="inline-flex h-14 items-center gap-2 rounded-full bg-black/40 px-5 text-sm font-bold backdrop-blur active:scale-95"
-          >
-            <KeyboardIcon size={20} weight="bold" />
-            {t("typeInstead")}
-          </button>
+          {onTypeCode && typeLabel ? (
+            <button
+              type="button"
+              onClick={onTypeCode}
+              className="inline-flex h-14 items-center gap-2 rounded-full bg-black/40 px-5 text-sm font-bold backdrop-blur active:scale-95"
+            >
+              <KeyboardIcon size={20} weight="bold" />
+              {typeLabel}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     login_max_failures: int = 5  # wrong tries before sign-in is paused
     login_lockout_minutes: int = 15
 
+    # Employee IDs typed on the passenger page must look like this (there is no staff list to check them against).
+    # Default: 3 letters and 4 digits, e.g. EMP2210. Letter case does not matter. Change it here when the format is fixed.
+    passenger_id_pattern: str = r"^[A-Za-z]{3}[0-9]{4}$"
     # Base address of the web app; QR codes are links like {public_base_url}/p/<token>.
     public_base_url: str = "http://localhost:3000"
     # Where dashboard photos are saved in development (Azure Blob Storage comes later).

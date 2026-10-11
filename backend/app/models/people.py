@@ -33,7 +33,8 @@ class Passenger(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_id: Mapped[str] = mapped_column(String(40), unique=True)
-    name: Mapped[str] = mapped_column(String(120))
+    # Empty when the employee only typed an ID on the passenger page (there is no staff list to look it up).
+    name: Mapped[str | None] = mapped_column(String(120))
     department: Mapped[str | None] = mapped_column(String(120))
     phone: Mapped[str | None] = mapped_column(String(30))
     status: Mapped[RecordStatus] = mapped_column(

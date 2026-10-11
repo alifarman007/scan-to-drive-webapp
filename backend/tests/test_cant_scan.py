@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.models import Trip
 from tests.test_admin_trips import hdr, make_admin
 from tests.test_end_trip import (  # noqa: F401  (client fixture comes from there)
-    client, confirm_end, end, events, make_passenger, running_trip, set_setting, token_of,
+    client, confirm_end, end, events, lock_stage, make_passenger, running_trip, set_setting, token_of,
 )
 from tests.test_trips import auth, make_car, make_driver, start
 from app.models import AdminRole
@@ -57,8 +57,7 @@ def test_cant_scan_only_for_the_trips_driver_and_only_while_waiting(client, db):
 
 def test_cant_scan_works_after_the_trip_is_locked_by_wrong_ids(client, db):
     driver, _, trip_id, raw = waiting_trip(client, db)
-    for _ in range(5):
-        client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "NOPE"})
+    lock_stage(db, trip_id, "start")
     assert client.post(f"/api/trips/{trip_id}/start-qr", headers=auth("driver", driver.id)).status_code == 423
     assert cant_scan(client, driver, trip_id).status_code == 200  # still flagged for the admin
 
@@ -126,17 +125,14 @@ def test_end_page_asks_who_the_passenger_is_when_the_start_was_skipped(client, d
     driver, car, p, trip_id = running_trip(client, db)
     normal = token_of(end(client, driver, trip_id).json()["end_qr"])
     assert client.get(f"/api/p/{normal}").json()["identify"] is False
-    assert client.post(f"/api/p/{normal}/lookup", json={"employee_id": p.employee_id}).status_code == 409
 
 
 def test_employee_identifies_at_the_end_and_the_trip_still_waits_for_approval(client, db):
     _, trip_id, raw = unconfirmed_trip_at_end(client, db)
     p = make_passenger(db, name="Faruk Ahmed")
-    # the name check works on the End QR too, and a wrong ID counts as a wrong try
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": "EMP-NOPE"})
-    assert r.status_code == 404 and r.json()["detail"]["tries_left"] == 4
-    assert client.post(f"/api/p/{raw}/lookup", json={"employee_id": p.employee_id.lower()}).json() == {"name": "Faruk Ahmed"}
-    r = confirm_end(client, raw, employee_id=p.employee_id)
+    # a badly formed ID is refused (not counted); then the ID, any letter case
+    assert confirm_end(client, raw, employee_id="EMP-NOPE").json()["detail"]["code"] == "BAD_ID_FORMAT"
+    r = confirm_end(client, raw, employee_id=p.employee_id.lower())
     assert r.status_code == 200
     t = db.get(Trip, trip_id)
     db.refresh(t)

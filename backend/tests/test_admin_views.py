@@ -254,28 +254,25 @@ def test_detail_of_a_finished_trip_includes_admin_close_and_alerts(client, db):
 
 def test_detail_names_who_did_each_step_and_shows_the_lock(client, db):
     admin = make_admin(db)
-    car, driver = make_car(db), make_driver(db)
-    p = make_passenger(db, name="Faruk Ahmed")
-    body = start(client, driver, car).json()
-    t, raw = body["trip"]["id"], token_of(body["start_qr"])
-    lock = get(client, admin, f"/trips/{t}").json()["trip"]["lock"]
-    assert lock == {"stage": "start", "locked": False, "tries_left": 5}
-    for _ in range(5):
-        client.post(f"/api/p/{raw}/lookup", json={"employee_id": "EMP-NOPE"})
+    driver, car, p, t = running_trip(client, db)
+    raw = token_of(end(client, driver, t).json()["end_qr"])
+    assert get(client, admin, f"/trips/{t}").json()["trip"]["lock"] == {"stage": "end", "locked": False, "tries_left": 5}
+    for _ in range(5):  # another phone, another person's ID
+        confirm_end(client, raw, employee_id="XYZ0000")
     detail = get(client, admin, f"/trips/{t}").json()
-    assert detail["trip"]["lock"] == {"stage": "start", "locked": True, "tries_left": 0}
+    assert detail["trip"]["lock"] == {"stage": "end", "locked": True, "tries_left": 0}
     who = {e["event"]: e["who"] for e in detail["timeline"]}
     assert who["trip_started"] == {"kind": "driver", "ref": driver.employee_id, "name": driver.name}
+    assert who["journey_started"] == {"kind": "passenger", "ref": p.employee_id, "name": p.name}
     assert who["passenger_wrong_id"] == {"kind": "passenger", "ref": None, "name": None}
     assert who["qr_blocked"]["kind"] == "system"
-    # unlock, confirm, and the passenger's name shows up too
     client.post(f"/api/admin/trips/{t}/unlock", json={"reason": "typo"}, headers=hdr(admin))
-    new_raw = token_of(client.post(f"/api/trips/{t}/start-qr", headers=auth("driver", driver.id)).json()["start_qr"])
-    client.post(f"/api/p/{new_raw}/confirm-start", json={"passenger_type": "employee", "employee_id": p.employee_id})
+    new_raw = token_of(client.post(f"/api/trips/{t}/end-qr", headers=auth("driver", driver.id)).json()["end_qr"])
+    confirm_end(client, new_raw, employee_id=p.employee_id)
     detail = get(client, admin, f"/trips/{t}").json()
     who = {e["event"]: e["who"] for e in detail["timeline"]}
-    assert who["journey_started"]["name"] == "Faruk Ahmed" and who["trip_unlocked"] == {"kind": "admin", "ref": admin.username, "name": admin.username}
-    assert detail["trip"]["lock"] is None  # in progress: nothing to unlock
+    assert who["trip_unlocked"] == {"kind": "admin", "ref": admin.username, "name": admin.username}
+    assert detail["trip"]["lock"] is None  # completed: nothing to unlock
 
 
 def test_detail_says_who_approved(client, db):

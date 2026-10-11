@@ -1,9 +1,14 @@
 """Passenger pages. No sign-in: access comes from the one-time QR code on the driver's phone
 (PDF 6.2 steps P1-P2, 6.3 steps P3-P4, sections 8 and 13).
 
-Start QR: open the page, look up the name, confirm the start (employee ID, or visitor details).
-End QR:   open the summary, confirm the end with the SAME employee ID (or the same phone for a visitor).
+Start QR: open the page, confirm the start with an employee ID (name optional) or visitor details.
+          There is no staff list to check IDs against: the ID only has to look right (see passenger_id_pattern),
+          and a new ID is added to the passengers table. The phone is remembered for this trip (cookie).
+End QR:   open the summary and confirm. The same phone confirms with one tap; another phone types the SAME
+          employee ID (or the same phone number for a visitor). Then the passenger can rate the trip.
 """
+import re
+import secrets
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
@@ -12,15 +17,19 @@ from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import cookies_secure, settings
 from app.deps import get_db, optional_driver_id
 from app.errors import api_error
-from app.models import Passenger, RecordStatus, TripPhoto, TripStage, TripStatus, Vehicle
+from app.models import (
+    Passenger, RecordStatus, Trip, TripEvent, TripPhoto, TripReview, TripStage, TripStatus, Vehicle,
+)
+from app.security import (
+    PASSENGER_COOKIE_DAYS, hash_key, passenger_cookie_name, review_token_trip, sign_review_token,
+)
 from app.services import settings as app_settings
 from app.services.audit import log_event
 from app.services.phones import normalize_phone
-from app.services.qr_access import (
-    MAX_LOOKUPS_PER_TRIP, lookups_for_trip, register_wrong_try, resolve_token, tries_left,
-)
+from app.services.qr_access import register_wrong_try, resolve_token, tries_left
 from app.storage import PhotoStorage, get_storage
 
 router = APIRouter(prefix="/p", tags=["passenger"])
@@ -33,13 +42,10 @@ Reason = Annotated[str, StringConstraints(strip_whitespace=True, max_length=255)
 IMAGE_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 
-class LookupBody(BaseModel):
-    employee_id: EmployeeId
-
-
 class EmployeeConfirm(BaseModel):
     passenger_type: Literal["employee"]
     employee_id: EmployeeId
+    name: Name | None = None  # optional: there is no staff list to take it from
 
 
 class VisitorConfirm(BaseModel):
@@ -56,6 +62,12 @@ ConfirmStartBody = Annotated[EmployeeConfirm | VisitorConfirm, Field(discriminat
 class EndEmployeeConfirm(BaseModel):
     passenger_type: Literal["employee"]
     employee_id: EmployeeId
+    name: Name | None = None  # only used when nobody confirmed the start
+
+
+class EndRemembered(BaseModel):
+    """The same phone that confirmed the start: its cookie is the proof, nothing to type."""
+    passenger_type: Literal["remembered"]
 
 
 class EndVisitorConfirm(BaseModel):
@@ -67,16 +79,58 @@ class EndVisitorConfirm(BaseModel):
     reason: Reason | None = None
 
 
-ConfirmEndBody = Annotated[EndEmployeeConfirm | EndVisitorConfirm, Field(discriminator="passenger_type")]
+ConfirmEndBody = Annotated[EndEmployeeConfirm | EndVisitorConfirm | EndRemembered, Field(discriminator="passenger_type")]
+
+# Quick tags on the review. Good ones are offered for 4-5 stars, the others for 1-3 stars.
+REVIEW_TAGS = {
+    "safe_driving", "on_time", "clean_car", "polite_driver", "smooth_ride",
+    "rough_driving", "late", "dirty_car", "impolite", "phone_while_driving",
+}
+
+
+class ReviewBody(BaseModel):
+    token: str = Field(min_length=10, max_length=200)
+    rating: int = Field(ge=1, le=5)
+    tags: list[str] = Field(default_factory=list, max_length=10)
+    comment: str = Field(default="", max_length=500)
 
 
 def _find_passenger(db: Session, employee_id: str) -> Passenger | None:
-    return db.scalar(
-        select(Passenger).where(
-            func.upper(Passenger.employee_id) == employee_id.strip().upper(),
-            Passenger.status == RecordStatus.active,
-        )
+    return db.scalar(select(Passenger).where(func.upper(Passenger.employee_id) == employee_id.strip().upper()))
+
+
+def _valid_id(employee_id: str) -> str:
+    """The typed ID in capitals, if it has the agreed shape (letter case does not matter)."""
+    value = employee_id.strip().upper()
+    if not re.fullmatch(settings.passenger_id_pattern, value):
+        raise api_error(422, "BAD_ID_FORMAT", "This does not look like an employee ID", example="EMP2210")
+    return value
+
+
+def _remember_phone(response: Response, trip) -> None:
+    """After the start: remember this phone for this trip, so it can confirm the end with one tap."""
+    key = secrets.token_urlsafe(24)
+    trip.passenger_key_hash = hash_key(key)
+    response.set_cookie(
+        passenger_cookie_name(trip.id), key, max_age=PASSENGER_COOKIE_DAYS * 86400, httponly=True,
+        samesite="lax", secure=cookies_secure(), path="/",
     )
+
+
+def _is_remembered(request: Request, trip) -> bool:
+    raw = request.cookies.get(passenger_cookie_name(trip.id))
+    return bool(raw and trip.passenger_key_hash and secrets.compare_digest(hash_key(raw), trip.passenger_key_hash))
+
+
+def _who_started(db: Session, trip) -> str | None:
+    """Who confirmed the start, as typed on that phone: "Name · ID", or just the ID (or the visitor's name).
+    The name comes from this trip's own start record, not from the passengers table."""
+    if trip.passenger is not None:
+        detail = db.scalar(select(TripEvent.detail).where(
+            TripEvent.trip_id == trip.id, TripEvent.event == "journey_started").order_by(TripEvent.id.desc()).limit(1))
+        name = (detail or {}).get("name")
+        return f"{name} · {trip.passenger.employee_id}" if name else trip.passenger.employee_id
+    return trip.visitor_name
 
 
 def _reject_drivers_own_phone(driver_id: int | None, trip) -> None:
@@ -96,14 +150,22 @@ def _identify(db: Session, request: Request, row, trip, body) -> tuple[str, str,
     """Put the passenger on the trip: an employee by ID, or a visitor by name and phone.
     Returns (name to show, audit actor, audit detail). Raises the same errors as the start page."""
     if body.passenger_type == "employee":
-        passenger = _find_passenger(db, body.employee_id)
-        if passenger is None:
-            left = register_wrong_try(db, request, row, trip, body.employee_id)
-            raise api_error(404, "ID_NOT_FOUND", "ID not found", tries_left=left)
-        if passenger.employee_id.upper() == trip.driver.employee_id.upper():
+        if body.employee_id.strip().upper() == trip.driver.employee_id.upper():
             raise api_error(403, "PASSENGER_IS_DRIVER", "The driver cannot be the passenger of the same trip")
+        employee_id = _valid_id(body.employee_id)  # a typo in the shape is not counted as a wrong try
+        passenger = _find_passenger(db, employee_id)
+        if passenger is not None and passenger.status != RecordStatus.active:
+            raise api_error(403, "PASSENGER_INACTIVE", "This employee ID is turned off. Ask the transport office.")
+        if passenger is None:  # first trip of this employee: add them
+            passenger = Passenger(employee_id=employee_id, name=body.name or None)
+            db.add(passenger)
+            db.flush()
+        elif body.name:
+            passenger.name = body.name  # the latest name the employee typed
         trip.passenger_id = passenger.id
-        return passenger.name, f"passenger:{passenger.employee_id}", {"passenger": passenger.employee_id}
+        detail = {"passenger": passenger.employee_id, **({"name": body.name} if body.name else {})}
+        # Privacy: the page only ever shows back what was typed here, never a name stored for this ID
+        return body.name or passenger.employee_id, f"passenger:{passenger.employee_id}", detail
     if not app_settings.get_int(db, "allow_visitors"):
         raise api_error(403, "VISITORS_NOT_ALLOWED", "Please use your employee ID")
     if not body.name:
@@ -119,7 +181,9 @@ def _minutes(start: datetime | None, end: datetime | None) -> int | None:
 
 
 @router.get("/{token}")
-def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = Depends(optional_driver_id)):
+def open_qr(
+    token: str, request: Request, db: Session = Depends(get_db), driver_id: int | None = Depends(optional_driver_id),
+):
     """P1/S3 (Start QR) and P3/S6 (End QR): what the passenger sees after scanning.
 
     `opened_by_driver`: the page was opened on the trip driver's own signed-in phone, so it can say straight
@@ -138,6 +202,7 @@ def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = D
         "destination": trip.destination,
         "start_time": trip.start_time,
     }
+    remembered = row.kind == TripStage.end and _is_remembered(request, trip)
     if row.kind == TripStage.start:
         return {
             "kind": "start",
@@ -147,6 +212,7 @@ def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = D
             "allow_visitors": bool(app_settings.get_int(db, "allow_visitors")),
             "tries_left": left,
             "opened_by_driver": opened_by_driver,
+            "id_pattern": settings.passenger_id_pattern,
         }
     return {
         "kind": "end",
@@ -164,6 +230,11 @@ def open_qr(token: str, db: Session = Depends(get_db), driver_id: int | None = D
         # nobody confirmed the start: the page asks who the passenger is (employee ID or visitor details)
         "identify": _start_unconfirmed(trip),
         "allow_visitors": bool(app_settings.get_int(db, "allow_visitors")),
+        # this phone confirmed the start: one tap is enough (nothing to type)
+        "remembered": remembered,
+        # who is confirming, shown only to the phone that confirmed the start
+        "you": _who_started(db, trip) if remembered else None,
+        "id_pattern": settings.passenger_id_pattern,
         "expires_at": row.expires_at,
         "tries_left": left,
         "opened_by_driver": opened_by_driver,
@@ -199,35 +270,16 @@ def trip_photo(
     return _send_photo(db, storage, trip.id, TripStage(kind))
 
 
-@router.post("/{token}/lookup")
-def lookup_employee(token: str, body: LookupBody, request: Request, db: Session = Depends(get_db)):
-    """Show the employee's NAME (only) for the typed ID, so a typo is noticed before confirming.
-    A wrong ID counts toward the wrong-ID limit of the trip. Start QR, or an End QR when nobody confirmed the start."""
-    row, trip = resolve_token(db, token, lock=True)
-    if row.kind == TripStage.end and not _start_unconfirmed(trip):
-        raise api_error(409, "WRONG_QR", "This QR code is for a different step of the trip")
-    if lookups_for_trip(db, trip.id) >= MAX_LOOKUPS_PER_TRIP:
-        raise api_error(429, "TOO_MANY_LOOKUPS", "Too many tries. Please ask the driver or the admin.")
-
-    passenger = _find_passenger(db, body.employee_id)
-    if passenger is None:
-        left = register_wrong_try(db, request, row, trip, body.employee_id)
-        raise api_error(404, "ID_NOT_FOUND", "ID not found", tries_left=left)
-
-    log_event(db, request, "passenger_lookup", "passenger:unknown", trip_id=trip.id)
-    db.commit()
-    return {"name": passenger.name}
-
-
 @router.post("/{token}/confirm-start")
 def confirm_start(
     token: str,
     body: ConfirmStartBody,
     request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     driver_id: int | None = Depends(optional_driver_id),
 ):
-    """P2/S4: the passenger confirms the start. Status becomes In progress."""
+    """P2/S4: the passenger confirms the start. Status becomes In progress. The phone is remembered for the end."""
     row, trip = resolve_token(db, token, TripStage.start, lock=True)
     _reject_drivers_own_phone(driver_id, trip)
 
@@ -237,6 +289,7 @@ def confirm_start(
     trip.status = TripStatus.in_progress
     trip.journey_start_time = now
     row.used_at = now
+    _remember_phone(response, trip)
     log_event(db, request, "journey_started", actor, trip_id=trip.id, detail=detail)
     db.commit()
 
@@ -273,8 +326,16 @@ def confirm_end(
     if _start_unconfirmed(trip):
         # Nobody confirmed the start ("Passenger can't scan"): the passenger says who they are now.
         # The trip still waits for the office's approval, because the start itself was not confirmed.
+        if body.passenger_type == "remembered":
+            raise api_error(422, "WRONG_PASSENGER_TYPE", "Please say who you are")
         identified = _identify(db, request, row, trip, body)
         actor = identified[1]
+    elif body.passenger_type == "remembered":
+        # the phone that confirmed the start: nothing to type. Not counted as a wrong try when it fails
+        # (the cookie may simply have been cleared); the page then asks for the ID.
+        if not _is_remembered(request, trip):
+            raise api_error(403, "NOT_REMEMBERED", "This phone is not the one that confirmed the start")
+        actor = f"passenger:{trip.passenger.employee_id}" if trip.passenger else f"visitor:{trip.visitor_phone}"
     else:
         expected = "visitor" if trip.is_visitor else "employee"
         if body.passenger_type != expected:
@@ -301,6 +362,8 @@ def confirm_end(
     detail = {"end_km": trip.end_km, "distance_km": trip.distance_km}
     if identified is not None:
         detail.update(identified[2], identified_at_end=True)
+    if body.passenger_type == "remembered":
+        detail["same_phone"] = True
     log_event(db, request, "trip_completed", actor, trip_id=trip.id, detail=detail)
     db.commit()
 
@@ -315,5 +378,28 @@ def confirm_end(
             "distance_km": trip.distance_km,
             "journey_minutes": _minutes(trip.journey_start_time, trip.end_time),
             "end_confirm_time": trip.end_confirm_time,
+            "driver_name": trip.driver.name,
         },
+        # lets this phone rate the trip for the next 2 hours (one review per trip)
+        "review_token": sign_review_token(trip.id),
     }
+
+
+@router.post("/review", status_code=201)
+def review_trip(body: ReviewBody, request: Request, db: Session = Depends(get_db)):
+    """The passenger rates the finished trip: 1-5 stars, quick tags, an optional comment. Once per trip."""
+    trip_id = review_token_trip(body.token)
+    if trip_id is None:
+        raise api_error(403, "REVIEW_LINK_EXPIRED", "This review link is not valid any more")
+    trip = db.get(Trip, trip_id)
+    if trip is None or trip.status != TripStatus.completed:
+        raise api_error(404, "TRIP_NOT_FOUND", "Trip not found")
+    if db.scalar(select(TripReview.id).where(TripReview.trip_id == trip_id)) is not None:
+        raise api_error(409, "ALREADY_REVIEWED", "This trip has already been rated")
+    tags = sorted({t for t in body.tags if t in REVIEW_TAGS})
+    comment = body.comment.strip() or None
+    db.add(TripReview(trip_id=trip_id, rating=body.rating, tags=tags, comment=comment))
+    actor = f"passenger:{trip.passenger.employee_id}" if trip.passenger else f"visitor:{trip.visitor_phone}" if trip.is_visitor else "passenger:unknown"
+    log_event(db, request, "trip_reviewed", actor, trip_id=trip_id, detail={"rating": body.rating, "tags": tags})
+    db.commit()
+    return {"rating": body.rating, "tags": tags, "comment": comment}

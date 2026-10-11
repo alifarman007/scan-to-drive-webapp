@@ -6,7 +6,7 @@
  * Shown once per browser tab (a reload in the same tab skips it), never on the passenger pages (/p/...),
  * where the one-time code is already counting down. With "reduce motion" it simply fades.
  */
-const MOTTO = "Relentless pursuit of better";
+import { MOTTO } from "@/lib/brand";
 
 // Runs before the first paint: decides whether the preloader plays, and lets the page know.
 const DECIDE = `(function(){try{var d=document.documentElement;

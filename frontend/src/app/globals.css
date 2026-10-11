@@ -34,6 +34,7 @@
   --wait-bg: #fef1d6; --wait-fg: #8a4b08; --wait-dot: #e59a1a;
   --bad-bg: #fde6ea;  --bad-fg: #a3182f;  --bad-dot: #d93250;
   --off-bg: #eef1f6;  --off-fg: #475066;  --off-dot: #8a93a8;
+  --star: #f5a524;    --star-soft: #fdecc8;
 
   color-scheme: light;
 }
@@ -64,6 +65,7 @@
   --wait-bg: #3d2a08; --wait-fg: #f7c266; --wait-dot: #e59a1a;
   --bad-bg: #4a1220;  --bad-fg: #ff9db0;  --bad-dot: #ff5c7a;
   --off-bg: #1e2647;  --off-fg: #aeb6cc;  --off-dot: #8a93a8;
+  --star: #ffc145;    --star-soft: #3d2f10;
 
   color-scheme: dark;
 }
@@ -94,6 +96,7 @@
   --color-wait-bg: var(--wait-bg); --color-wait-fg: var(--wait-fg); --color-wait-dot: var(--wait-dot);
   --color-bad-bg: var(--bad-bg);   --color-bad-fg: var(--bad-fg);   --color-bad-dot: var(--bad-dot);
   --color-off-bg: var(--off-bg);   --color-off-fg: var(--off-fg);   --color-off-dot: var(--off-dot);
+  --color-star: var(--star);       --color-star-soft: var(--star-soft);
 }
 
 @theme {

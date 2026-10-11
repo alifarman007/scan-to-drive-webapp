@@ -8,6 +8,7 @@ import {
   FunnelSimpleXIcon,
   MagnifyingGlassIcon,
   SealCheckIcon,
+  StarIcon,
   UserIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -419,6 +420,12 @@ function TripRow({ trip }: { trip: HistoryTrip }) {
     <span className="flex min-w-0 items-center gap-1.5">
       {trip.is_visitor ? <UserIcon size={14} className="shrink-0 text-muted" aria-label={t("visitor")} /> : null}
       <span className="truncate">{trip.passenger_name}</span>
+      {trip.rating ? (
+        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-star-soft/70 px-1.5 text-xs font-bold text-title tabular-nums" title={t("rated", { rating: trip.rating })}>
+          <StarIcon size={11} weight="fill" className="text-star" />
+          {trip.rating}
+        </span>
+      ) : null}
     </span>
   ) : trip.status === "cancelled" ? (
     <span className="text-muted">–</span>

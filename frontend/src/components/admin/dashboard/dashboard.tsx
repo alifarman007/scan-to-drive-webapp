@@ -1,13 +1,11 @@
 "use client";
 
-import { ArrowClockwiseIcon, ArrowRightIcon, TimerIcon, WifiSlashIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, WifiSlashIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAdminUser } from "@/components/admin/admin-shell";
-import { Card } from "@/components/ui/card";
 import { LiveDot } from "@/components/ui/live-dot";
 import { Reveal } from "@/components/ui/reveal";
 import { adminApi, isSignedOut, toSignIn, type Dashboard as Data } from "@/lib/admin-api";
@@ -17,6 +15,7 @@ import { AlertsPanel } from "./alerts-panel";
 import { CarBoard } from "./car-board";
 import { KmPerCar, TripsPerDay } from "./charts";
 import { LiveTrips } from "./live-trips";
+import { RatingsPanel } from "./ratings";
 import { StatCards } from "./stat-cards";
 
 /** Asks the server again this often while the page is on screen (and straight away when it comes back). */
@@ -122,7 +121,7 @@ export function Dashboard({ initial }: { initial: Data }) {
         </Reveal>
         <Reveal delay={0.16} className="flex min-w-0 flex-col gap-section">
           <AlertsPanel alerts={data.alerts} total={data.cards.open_alerts} asOf={data.as_of} onChanged={() => void load()} />
-          <OvertimeTeaser />
+          <RatingsPanel ratings={data.ratings} asOf={data.as_of} />
         </Reveal>
       </div>
 
@@ -139,27 +138,5 @@ export function Dashboard({ initial }: { initial: Data }) {
         </Reveal>
       </div>
     </div>
-  );
-}
-
-/** Driver overtime is planned for the next phase: a small, honest pointer to its page. */
-function OvertimeTeaser() {
-  const t = useTranslations();
-  return (
-    <Link href="/admin/overtime" className="group block rounded-card">
-      <Card className="relative flex items-center gap-3 overflow-hidden border-dashed p-4 transition-colors group-hover:border-border-strong">
-        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-soft text-accent">
-          <TimerIcon size={20} weight="duotone" />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-2 text-sm font-bold text-title">
-            {t("nav.overtime")}
-            <span className="rounded-full bg-soft px-2 py-0.5 text-[0.65rem] font-bold tracking-wide text-accent uppercase">{t("common.phase2")}</span>
-          </span>
-          <span className="text-xs text-muted">{t("dashboard.overtimeHint")}</span>
-        </span>
-        <ArrowRightIcon size={16} className="text-muted transition-transform group-hover:translate-x-0.5" />
-      </Card>
-    </Link>
   );
 }

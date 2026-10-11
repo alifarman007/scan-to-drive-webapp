@@ -10,6 +10,7 @@ import {
   ProhibitIcon,
   SealCheckIcon,
   SealWarningIcon,
+  StarIcon,
   SteeringWheelIcon,
   UserIcon,
   WarningIcon,
@@ -21,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useAdminUser } from "@/components/admin/admin-shell";
+import { Stars } from "@/components/admin/stars";
 import { TripStatusChip } from "@/components/admin/trip-status";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
@@ -276,8 +278,12 @@ function People({ trip }: { trip: Trip }) {
         <Person
           icon={<IdentificationBadgeIcon size={13} weight="bold" />}
           role={t("employee")}
-          name={trip.passenger.name}
-          lines={[[trip.passenger.employee_id, trip.passenger.department].filter(Boolean).join(" · ")]}
+          name={trip.passenger.name ?? trip.passenger.employee_id}
+          lines={
+            trip.passenger.name
+              ? [[trip.passenger.employee_id, trip.passenger.department].filter(Boolean).join(" · ")]
+              : [t("noNameGiven")]
+          }
         />
       ) : trip.visitor ? (
         <Person
@@ -291,7 +297,45 @@ function People({ trip }: { trip: Trip }) {
         <Person icon={<UserIcon size={13} weight="bold" />} role={t("passenger")} name="" lines={[t("unknownPassenger")]} tone="wait" />
       )}
       {trip.with_passenger && trip.purpose ? <span className="text-sm text-muted">{t("purpose", { purpose: trip.purpose })}</span> : null}
+      {trip.review ? (
+        <PassengerReview review={trip.review} />
+      ) : trip.with_passenger && trip.status === "completed" && trip.end_confirm_time ? (
+        <span className="mt-auto inline-flex items-center gap-1.5 text-xs text-muted">
+          <StarIcon size={13} weight="regular" />
+          {t("notRated")}
+        </span>
+      ) : null}
     </Card>
+  );
+}
+
+/** The passenger's stars, tags and comment, given after confirming the end. */
+function PassengerReview({ review }: { review: NonNullable<Trip["review"]> }) {
+  const t = useTranslations("tripDetail.people");
+  const tt = useTranslations("reviewTags");
+  const format = useFormatter();
+  const good = review.rating >= 4;
+  return (
+    <div className={cn("mt-auto flex flex-col gap-2.5 rounded-2xl p-3.5", good ? "bg-star-soft/45" : "bg-bad-bg/50")}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-muted">{t("rating")}</span>
+        <span className="flex items-center gap-2">
+          <Stars value={review.rating} size={16} />
+          <span className="font-display text-sm font-bold text-title tabular-nums">{review.rating}/5</span>
+        </span>
+      </div>
+      {review.tags.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {review.tags.map((tag) => (
+            <span key={tag} className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold", good ? "bg-card text-ok-fg" : "bg-card text-bad-fg")}>
+              {tt(tag)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {review.comment ? <p className="text-sm whitespace-pre-line text-text">&ldquo;{review.comment}&rdquo;</p> : null}
+      <span className="text-xs text-muted">{format.dateTime(new Date(review.at), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+    </div>
   );
 }
 

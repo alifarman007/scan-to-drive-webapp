@@ -21,6 +21,12 @@ def _uid() -> str:
     return uuid.uuid4().hex[:8]
 
 
+def emp_id() -> str:
+    """A random employee ID in the agreed shape (3 letters + 4 digits), e.g. TQX4821."""
+    import random
+    return "T" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ", k=2)) + f"{random.randint(0, 9999):04d}"
+
+
 @pytest.fixture()
 def client(db, tmp_path):
     storage = LocalStorage(tmp_path)
@@ -31,7 +37,7 @@ def client(db, tmp_path):
 
 
 def make_passenger(db, name="Nadia Islam", **kw):
-    p = Passenger(employee_id=f"EMP-{_uid()}", name=name, department="HR", phone="01711-000000", **kw)
+    p = Passenger(employee_id=emp_id(), name=name, department="HR", phone="01711-000000", **kw)
     db.add(p)
     db.flush()
     return p
@@ -117,32 +123,51 @@ def test_cancelled_trip_qr_is_dead(client, db):
     assert r.status_code == 410 and r.json()["detail"]["code"] == "TRIP_CANCELLED"
 
 
-# ---- name look-up ---------------------------------------------------------------------------
+# ---- typed employee IDs (no staff list) --------------------------------------------------------
 
-def test_lookup_returns_the_name_only(client, db):
+def test_any_well_formed_id_is_accepted_and_added(client, db):
+    _, _, trip_id, raw = new_trip(client, db)
+    r = client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "  emp7788 ", "name": "Rafiq Hasan"})
+    assert r.status_code == 200 and r.json()["trip"]["passenger_name"] == "Rafiq Hasan"
+    p = db.scalar(select(Passenger).where(Passenger.employee_id == "EMP7788"))
+    assert p is not None and p.name == "Rafiq Hasan"
+    assert db.get(Trip, trip_id).passenger_id == p.id
+
+
+def test_name_is_optional_and_the_id_is_shown_instead(client, db):
+    _, _, _, raw = new_trip(client, db)
+    r = confirm_employee(client, raw, "Abc1234")
+    assert r.status_code == 200 and r.json()["trip"]["passenger_name"] == "ABC1234"
+
+
+def test_badly_formed_id_is_refused_but_not_counted(client, db):
+    _, _, _, raw = new_trip(client, db)
+    for bad in ("EMP-2210", "EM2210", "EMP221", "2210EMP"):
+        r = confirm_employee(client, raw, bad)
+        assert r.status_code == 422 and r.json()["detail"]["code"] == "BAD_ID_FORMAT"
+    assert client.get(f"/api/p/{raw}").json()["tries_left"] == 5
+
+
+def test_turned_off_employee_is_refused(client, db):
+    _, _, _, raw = new_trip(client, db)
+    p = make_passenger(db, status=RecordStatus.inactive)
+    r = confirm_employee(client, raw, p.employee_id)
+    assert r.status_code == 403 and r.json()["detail"]["code"] == "PASSENGER_INACTIVE"
+
+
+def test_no_name_lookup_any_more(client, db):
+    """Privacy: the page must not tell who an employee ID belongs to."""
     _, _, _, raw = new_trip(client, db)
     p = make_passenger(db)
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": f"  {p.employee_id.lower()} "})  # trimmed, any case
-    assert r.status_code == 200 and r.json() == {"name": "Nadia Islam"}  # no department, phone or id
+    assert client.post(f"/api/p/{raw}/lookup", json={"employee_id": p.employee_id}).status_code in (404, 405)
 
 
-def test_lookup_of_unknown_or_inactive_id_counts_as_wrong(client, db):
-    _, _, _, raw = new_trip(client, db)
-    inactive = make_passenger(db, status=RecordStatus.inactive)
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": inactive.employee_id})
-    assert r.status_code == 404 and r.json()["detail"]["code"] == "ID_NOT_FOUND" and r.json()["detail"]["tries_left"] == 4
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": "NOPE"})
-    assert r.json()["detail"]["tries_left"] == 3
-    assert client.get(f"/api/p/{raw}").json()["tries_left"] == 3
-
-
-def test_lookup_is_limited_so_names_cannot_be_listed(client, db):
-    _, _, _, raw = new_trip(client, db)
-    p = make_passenger(db)
-    for _ in range(15):
-        assert client.post(f"/api/p/{raw}/lookup", json={"employee_id": p.employee_id}).status_code == 200
-    r = client.post(f"/api/p/{raw}/lookup", json={"employee_id": p.employee_id})
-    assert r.status_code == 429 and r.json()["detail"]["code"] == "TOO_MANY_LOOKUPS"
+def test_start_remembers_this_phone(client, db):
+    _, _, trip_id, raw = new_trip(client, db)
+    r = confirm_employee(client, raw, make_passenger(db).employee_id)
+    cookie = r.headers["set-cookie"]
+    assert f"s2d_pax{trip_id}=" in cookie and "HttpOnly" in cookie and "SameSite=lax" in cookie
+    assert db.get(Trip, trip_id).passenger_key_hash  # only the hash is kept
 
 
 # ---- confirm start: employee -----------------------------------------------------------------
@@ -152,7 +177,8 @@ def test_employee_confirms_the_start(client, db):
     p = make_passenger(db)
     r = confirm_employee(client, raw, p.employee_id)
     assert r.status_code == 200
-    assert r.json()["trip"]["status"] == "in_progress" and r.json()["trip"]["passenger_name"] == "Nadia Islam"
+    # the passenger's page shows only what was typed (here just the ID), never the name stored for that ID
+    assert r.json()["trip"]["status"] == "in_progress" and r.json()["trip"]["passenger_name"] == p.employee_id
 
     trip = db.get(Trip, trip_id)
     db.refresh(trip)
@@ -213,59 +239,7 @@ def test_driver_cannot_be_the_passenger_of_own_trip(client, db):
     assert client.get(f"/api/p/{raw}").json()["tries_left"] == 5  # not counted as a wrong try
 
 
-# ---- the wrong-ID limit -----------------------------------------------------------------------
-
-def test_five_wrong_ids_block_the_qr_and_alert_the_admin(client, db):
-    driver, car, trip_id, raw = new_trip(client, db)
-    p = make_passenger(db)
-    lefts = [confirm_employee(client, raw, "WRONG").json()["detail"]["tries_left"] for _ in range(5)]
-    assert lefts == [4, 3, 2, 1, 0]
-
-    for r in (client.get(f"/api/p/{raw}"), confirm_employee(client, raw, p.employee_id)):
-        assert r.status_code == 423 and r.json()["detail"]["code"] == "QR_BLOCKED"
-
-    alert = db.scalar(select(Alert).where(Alert.trip_id == trip_id))
-    assert alert.type.value == "wrong_ids" and alert.status.value == "open" and alert.vehicle_id == car.id
-    assert len(events(db, "passenger_wrong_id", trip_id)) == 5 and events(db, "qr_blocked", trip_id)
-    assert db.scalar(select(func.count()).select_from(Alert).where(Alert.trip_id == trip_id)) == 1
-
-
-def test_making_a_new_qr_does_not_reset_the_wrong_id_count(client, db):
-    driver, _, trip_id, raw = new_trip(client, db)
-    for _ in range(5):
-        confirm_employee(client, raw, "WRONG")
-    r = client.post(f"/api/trips/{trip_id}/start-qr", headers=auth("driver", driver.id))
-    assert r.status_code == 423 and r.json()["detail"]["code"] == "TRIP_LOCKED"
-    active = client.get("/api/trips/active", headers=auth("driver", driver.id)).json()
-    assert active["start_qr_blocked"] is True
-    # the driver can still cancel and start again
-    assert client.post(f"/api/trips/{trip_id}/cancel", json={"reason": "Passenger typed wrong IDs"},
-                       headers=auth("driver", driver.id)).status_code == 200
-
-
-def test_wrong_tries_are_counted_across_new_qr_codes(client, db):
-    driver, _, trip_id, raw1 = new_trip(client, db)
-    for _ in range(3):
-        confirm_employee(client, raw1, "WRONG")
-    raw2 = client.post(f"/api/trips/{trip_id}/start-qr", headers=auth("driver", driver.id)).json()["start_qr"]["url"].rsplit("/p/", 1)[1]
-    assert client.get(f"/api/p/{raw2}").json()["tries_left"] == 2
-    assert confirm_employee(client, raw2, "WRONG").json()["detail"]["tries_left"] == 1
-
-
-def test_limit_follows_the_admin_setting(client, db):
-    set_setting(db, "wrong_id_limit", 2)
-    _, _, trip_id, raw = new_trip(client, db)
-    confirm_employee(client, raw, "WRONG")
-    assert confirm_employee(client, raw, "WRONG").json()["detail"]["tries_left"] == 0
-    assert client.get(f"/api/p/{raw}").status_code == 423
-
-
-def test_a_correct_id_before_the_limit_still_works(client, db):
-    _, _, _, raw = new_trip(client, db)
-    p = make_passenger(db)
-    for _ in range(4):
-        confirm_employee(client, raw, "WRONG")
-    assert confirm_employee(client, raw, p.employee_id).status_code == 200
+# (The wrong-ID limit now only applies at the end, on a phone that is not the one that started: see test_end_trip.)
 
 
 # ---- visitors ("Other") -----------------------------------------------------------------------

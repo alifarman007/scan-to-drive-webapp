@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.models import AdminRole, AdminUser, Alert, TripToken
 from tests.test_end_trip import (  # noqa: F401  (client fixture comes from there)
-    _uid, client, confirm_end, end, events, make_passenger, running_trip, token_of,
+    _uid, client, confirm_end, end, events, lock_stage, make_passenger, running_trip, token_of,
 )
 from tests.test_trips import auth, make_car, make_driver, start
 
@@ -152,9 +152,8 @@ def test_unlock_gives_fresh_tries_at_the_end(client, db):
 def test_unlock_works_at_the_start_too(client, db):
     car, driver = make_car(db), make_driver(db)
     body = start(client, driver, car).json()
-    trip_id, raw = body["trip"]["id"], token_of(body["start_qr"])
-    for _ in range(5):
-        client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "NOPE"})
+    trip_id = body["trip"]["id"]
+    lock_stage(db, trip_id, "start")
     assert client.post(f"/api/trips/{trip_id}/start-qr", headers=auth("driver", driver.id)).status_code == 423
     r = unlock(client, make_admin(db), trip_id)
     assert r.status_code == 200 and r.json()["stage"] == "start"
@@ -166,8 +165,7 @@ def test_unlock_only_resets_the_blocked_stage(client, db):
     car, driver = make_car(db), make_driver(db)
     body = start(client, driver, car).json()
     trip_id, raw = body["trip"]["id"], token_of(body["start_qr"])
-    for _ in range(2):
-        client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "NOPE"})
+    lock_stage(db, trip_id, "start", tries=2)
     p = make_passenger(db)
     client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": p.employee_id})
     end_raw = token_of(end(client, driver, trip_id).json()["end_qr"])

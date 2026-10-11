@@ -679,6 +679,77 @@ Frontend:
 - [x] Checked in the sandbox (laptop and phone): opening screen timing, skipped on reload and on the passenger page, dock hiding and showing,
       search and More sheets. Lint, types and production build pass.
 - [ ] To verify: open the app in a new tab on the laptop and on a phone; open the admin pages on a phone.
+- [x] Fixes after testing on the laptop: the opening screen also plays right after an admin signs in; the dashboard numbers no longer
+      cause a hydration error (they always start from 0, then count up); the deciding script moved into `<head>`; a browser extension
+      adding attributes to `<body>` (ColorZilla) no longer shows a warning.
+- Note: when Windows "Animation effects" is off (Settings > Accessibility > Visual effects), the browser reports "reduce motion" and the app
+  keeps still on purpose: no moving road, the opening screen only fades, cards appear without sliding.
+
+### 2026-10-11 (changes: welcome page, typed passenger IDs, one-tap end, ratings, new IDs)
+
+What changed and why:
+- No chooser page any more. Drivers come in only by scanning the QR sticker in the car (sign in if needed, then straight to that car's
+  start page; one scan, also in a demo). The bare address (for example scantodrive.epicbd.com) is for the transport office.
+- Privacy: there is no staff list to take names from, so the passenger page no longer says "Is this you? <name>". The passenger types
+  the employee ID (3 letters and 4 digits, any letter case, no dash, for example EMP2210; the format is not final) and, if they like, a name.
+- The phone that confirmed the start is remembered for that trip, so the end is one tap. Another phone (or a cleared browser) types the
+  same employee ID (a visitor: the same phone number).
+- After confirming the end the passenger can rate the ride. Only the transport office sees it.
+- Driver IDs are now DR9001, DR9002, ... and passenger IDs have no dash (EMP2210). IDs work in any letter case everywhere.
+
+Backend:
+- [x] Migration `0005_typed_passengers_reviews`: `passengers.name` may be empty, `trips.passenger_key_hash` (hash of the "remembered
+      phone" key), new table `trip_reviews` (trip, rating 1-5, tags, comment, time; one per trip).
+- [x] `POST /api/p/{token}/lookup` is gone. On confirm-start an employee sends `employee_id` and an optional `name`. Any ID with the right
+      shape is accepted (`passenger_id_pattern` in `app/config.py`, now `^[A-Za-z]{3}[0-9]{4}$`, letter case ignored, stored in capitals).
+      A new ID is added to `passengers`. A badly shaped ID gets `422 BAD_ID_FORMAT` and is not counted as a wrong try. A turned-off ID gets
+      `403 PASSENGER_INACTIVE`. The driver's own ID is still refused.
+- [x] The passenger page only shows back what was typed on it (the typed name, or the ID), never a name stored for that ID.
+- [x] Confirm-start sets an httpOnly cookie `s2d_pax<trip id>` (2 days; only its hash is kept). The End QR page then says `remembered: true`
+      and `you` ("Name · ID" as typed at the start, or just the ID). Confirm-end with `{"passenger_type":"remembered"}` completes the trip;
+      a phone without the cookie gets `403 NOT_REMEMBERED` (not counted as a wrong try) and types the ID instead. The audit log marks
+      `same_phone`.
+- [x] Confirm-end returns `driver_name` and a `review_token` (signed, 2 hours). `POST /api/p/review` saves the rating (1-5, quick tags,
+      comment up to 500 characters); a second rating gets `409 ALREADY_REVIEWED`. Logged as `trip_reviewed`.
+- [x] Admin: trip history rows have `rating`, trip detail has `review`, the dashboard has `ratings` (this month's average, count, how many
+      of each star, the last 3 with driver, tags and comment).
+- [x] `python -m app.rename_ids` renames the IDs in an existing database, keeping all trips: drivers in order of their current ID become
+      DR9001, DR9002, ... (EMP-1021 Rahim Uddin became DR9001), passengers lose the dash (EMP-2210 became EMP2210). Without `--apply` it only
+      shows what it would do. The audit log cannot be changed (append-only), so the script writes one `employee_ids_renamed` entry and the trip
+      timeline shows old entries under the new IDs. PINs stay the same.
+- [x] Seed: new sample IDs (DR9001-DR9004, EMP2210-EMP2215), only added when the drivers / passengers tables are empty.
+- [x] 294 tests pass (passenger tests rewritten for typed IDs; new: remembered phone, reviews, renaming, privacy of stored names).
+
+Frontend:
+- [x] `/` is a welcome page: hero with "Admin sign in" (or "Open the dashboard" when already signed in), how a trip works in 3 steps,
+      a card for drivers (scan the sticker in your car) and one for passengers (scan the driver's code). Admin sign-in page: the
+      "Driver sign in" link is now a short note for drivers.
+- [x] Passenger start page: employee ID box cleans what is typed (capitals, no spaces or dashes) and shows a green tick once the shape is
+      right; a wrong shape is caught on the page with a short message. Optional name box. Visitors unchanged.
+- [x] After confirming the start: "When you arrive" card with a "Scan the end QR" button that opens the camera inside the page (same scanner
+      as the driver's, now reusable) and goes straight to the end page. Or close the page and scan later with the camera. Opening the old
+      Start QR link again on that phone also offers the button.
+- [x] End page on the remembered phone: green card "This phone started the trip" with the name and ID, one big "Confirm end of trip" button,
+      and "Not you? Type the employee ID instead". If the browser forgot the phone meanwhile, the page says so and shows the ID box.
+- [x] After the end: "How was your ride?" with 5 stars (they pop in one after another), a word for each star, quick tags that fit the stars
+      (what went well for 4-5, what could be better for 1-3), optional comment, Send or Skip. Thank-you with stars around a heart.
+- [x] Admin: Passengers, Reports, Audit log and Driver overtime are hidden from the sidebar and the phone menus for now (`HIDDEN_NAV` in
+      `src/components/admin/nav.ts`; take a key out to show the page again). The overtime card on the dashboard is replaced by
+      "Passenger ratings" (average, spread of the stars, latest ratings with tags and comment, each opens its trip). Trip history shows a small
+      star with the rating; trip detail shows the rating, tags and comment under People, and the timeline shows "Passenger rated the trip".
+      A passenger without a name shows the ID and "No name given".
+- [x] Driver: sign-in example now says DR9001; the End QR screen says the passenger confirms with one tap on the same phone.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox (laptop 1440 px, phone 390 px): welcome page light and dark, admin sign-in, sticker without sign-in > sign in as
+      `dr9001` > back on the car's start page, wrong-shape ID, `Emp-1100` cleaned to EMP1100 with a name, Start done, old Start link with the
+      scan button, in-page scanner reading the End QR (fake camera), one-tap end, review (4 stars, change to 2 stars swaps the tags, 5 stars,
+      tags, comment, send), another phone typing a wrong ID then the right one in small letters, skip, cleared browser falling back to the ID
+      box, Bangla, admin menu without the hidden pages, ratings card, trip detail with the review, phone "More" sheet. No browser errors.
+      Lint, types and production build pass.
+- Note: the camera inside the page needs https (or localhost). With `npm run dev:lan:https` it works on the phones; with plain http the
+      scanner says it needs a secure address, and the phone's own camera app still works.
+- [ ] To verify on the phones: scan a car sticker while signed out (sign in, then the start page); passenger confirms the start with an ID and
+      a name; at the end tap "Scan the end QR" (or reopen the page), confirm with one tap and rate; try the end on a second phone with the ID.
 
 ## Database (PDF section 16)
 
@@ -709,6 +780,7 @@ completed trips locked except admin corrections with a reason; never delete cars
   `trip_events.detail` (JSONB) holds reasons or changes.
 - `alerts.note`, `alerts.resolved_at`; `admin_users.status`; `vehicles.reg_number` is unique.
 - `trips.is_visitor`, `visitor_name`, `visitor_phone`, `visitor_reason` (migration 0002, for passengers who are not EPIC employees).
+- `trips.passenger_key_hash` (the phone that confirmed the start), `trip_reviews` (passenger rating), `passengers.name` optional (migration 0005).
 - `created_at` / `updated_at` columns on most tables.
 
 ### Assumptions to confirm
@@ -726,6 +798,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pydantic-settings bcrypt pyjwt httpx python-multipart apscheduler qrcode reportlab pillow openpyxl pytest
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 python -m alembic upgrade head   # create/update tables
+python -m app.rename_ids         # only for a database made before 2026-10-11: shows the new IDs; add --apply to rename
 python -m app.seed               # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
 python -m pytest -q              # all backend tests
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000   # API at http://127.0.0.1:8000, docs at /api/docs
@@ -810,8 +883,7 @@ npm run start:lan             # run the production build for phones (faster than
 | GET | `/api/p/{token}` | anyone with the QR | passenger page data after scanning a Start QR (trip details) or an End QR (summary); `opened_by_driver` when opened on the trip driver's own phone |
 | GET | `/api/p/{token}/photo` | anyone with the QR | start dashboard photo (only while the QR is valid) |
 | GET | `/api/p/{token}/photo/{kind}` | anyone with the QR | `start` or `end` dashboard photo |
-| POST | `/api/p/{token}/lookup` | anyone with the QR | name for a typed employee ID (Start QR, or an End QR when nobody confirmed the start; wrong IDs count toward the limit) |
-| POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` or `visitor`; not from the driver's own session |
+| POST | `/api/p/{token}/confirm-start` | anyone with the QR | confirm start as `employee` (ID + optional name) or `visitor`; not from the driver's own session; remembers this phone for the trip |
 | POST | `/api/admin/trips/{id}/close` | admin | close any open trip with a reason (optional end km); car and driver are freed |
 | POST | `/api/admin/trips/{id}/unlock` | admin | reset wrong-ID tries of a blocked trip |
 | POST | `/api/trips/{id}/cant-scan` | driver | passenger cannot scan the Start QR: trip begins, marked for admin approval |
@@ -851,7 +923,8 @@ npm run start:lan             # run the production build for phones (faster than
 | GET | `/api/admin/audit/export` | admin | audit log as Excel or PDF (`format=xlsx|pdf`, same filters as `/api/admin/audit`) |
 | GET | `/api/purposes` | driver / admin | trip purposes to pick from |
 | PUT | `/api/admin/settings/purposes` | admin | replace the purposes list (logged) |
-| POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end with the same employee ID, or the same phone for a visitor; completes the trip |
+| POST | `/api/p/{token}/confirm-end` | anyone with the QR | confirm end: `remembered` (the phone that confirmed the start), or the same employee ID, or the same phone for a visitor; completes the trip and returns a `review_token` |
+| POST | `/api/p/review` | passenger (review token) | rate the finished trip: 1-5 stars, quick tags, optional comment; once per trip |
 
 Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 days, admins 8 hours.
 
@@ -874,7 +947,8 @@ Send the token as `Authorization: Bearer <token>`. Drivers stay signed in 30 day
 README.md                  this file
 docs/                      the project plan PDF
 backend/
-  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text)
+  alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text,
+                           0005_typed_passengers_reviews)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -889,7 +963,7 @@ backend/
   app/routers/admin_cars.py cars list, add / edit, new sticker version, sticker PDF
   app/routers/admin_people.py drivers and passengers: list, add, edit, reset PIN, Excel import
   app/routers/admin_views.py dashboard, trip history and detail, signed photo links, audit log
-  app/routers/passenger.py passenger pages: open QR (start or end), photos, lookup, confirm start, confirm end
+  app/routers/passenger.py passenger pages: open QR (start or end), photos, confirm start, confirm end (one tap on the same phone), review
   app/worker.py            background worker (alert checks every minute)
   app/routers/admin_reports.py reports and audit export
   app/routers/admin_users.py admin/viewer accounts; app/routers/admin_settings.py settings page
@@ -902,11 +976,13 @@ backend/
   app/storage.py           photo storage (local folder now, Azure Blob later)
   app/errors.py            error format helper; app/schemas.py response shapes
   app/seed.py              development seed data
+  app/rename_ids.py        one-off: new driver IDs (DR9001 ...) and passenger IDs without the dash, keeping all trips
   app/set_password.py      command to change/create admin passwords
   tests/test_db_rules.py   checks that the DB enforces the business rules
   tests/test_auth.py       sign-in, lockout and role-guard tests
   tests/test_trips.py      car page and start-trip tests
-  tests/test_passenger.py  passenger page, wrong-ID limit and visitor tests
+  tests/test_passenger.py  passenger page, typed IDs, wrong-ID limit and visitor tests
+  tests/test_remember_and_review.py one-tap end on the same phone, reviews, privacy of stored names
   tests/test_admin_trips.py admin close and unlock
   tests/test_admin_cars.py cars and stickers
   tests/test_admin_people.py drivers, passengers, import
@@ -921,7 +997,7 @@ backend/
 frontend/                  Next.js app
   messages/en.json, bn.json  all texts, English and Bangla
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
-  src/app/                 pages: / (start), /admin/* (behind sign-in), /driver, /styleguide (development only)
+  src/app/                 pages: / (welcome page with admin sign-in), /admin/* (behind sign-in), /driver, /styleguide (development only)
   src/components/ui/       shared pieces: Button, Input, Card, StatusChip, Odometer, CountdownRing, Reveal, ThemeToggle, LanguageSwitch
   src/components/admin/    admin frame (floating sidebar, top bar), phone dock (mobile-dock.tsx) and the menu list
   src/components/preloader.tsx opening screen with the logo and motto (once per tab)
@@ -933,15 +1009,17 @@ frontend/                  Next.js app
   src/app/driver/trip/     the open trip from Start QR to summary
   src/lib/driver-api.ts    types and calls for the driver screens, QR kept per tab, sticker check; photo.ts shrinks photos
   src/app/p/[token]/       passenger page (Start QR or End QR, or a notice when the code cannot be used)
-  src/components/passenger/identity-forms.tsx "who are you" forms (employee ID with name check, visitor), used on both pages
+  src/components/passenger/identity-forms.tsx "who are you" forms (employee ID + optional name, visitor), used on both pages
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
-  src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), trips running now, two charts
+  src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, two charts
   src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail
   src/components/admin/trips/ history list and filter bar, detail page, meter check with photo zoom, timeline, admin action dialogs
   src/lib/trip-filters.ts  reads and writes the trip history filters in the address
   src/lib/admin-api.ts     types and calls for the admin pages, back to sign-in when the session ends
   src/components/passenger/ passenger frame, start flow (employee / visitor), end flow, shared pieces (trip card, code timer, photo viewer, notices)
+  src/components/passenger/review.tsx "How was your ride?" stars, tags, comment
+  src/components/passenger/scan-end.tsx "Scan the end QR" button (camera inside the page)
   src/lib/passenger-api.ts types and calls for the passenger pages
   src/lib/api.ts           browser calls to the API (errors, X-S2D header); server-api.ts for server-side checks
   public/brand/            Epic Group logo (cream and navy)
@@ -950,10 +1028,11 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (frontend step 6) on the laptop, and commit.
-2. Frontend step 7: admin lists (cars and QR stickers, drivers, passengers and Excel import, alerts, audit log).
+1. Verify the unchecked items above (2026-10-11 changes) on the laptop and phones, and commit.
+2. Frontend step 7: admin lists (cars and QR stickers, drivers, alerts). Passengers, reports, audit log and overtime stay hidden for now.
 3. Then steps 8-9 as listed in the frontend step 1 entry.
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
+5. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
 
 ## Conventions for whoever continues
 

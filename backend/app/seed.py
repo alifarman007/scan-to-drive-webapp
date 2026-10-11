@@ -8,6 +8,7 @@ import os
 import secrets
 
 import bcrypt
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db import SessionLocal
@@ -29,19 +30,19 @@ CAR_MODELS = ["Toyota Axio", "Toyota Allion", "Toyota Noah", "Toyota Premio", "H
 START_KM = [41880, 22415, 45230, 30902, 18377, 9640, 12000, 27500, 33100, 15800]
 
 DRIVERS = [
-    ("EMP-1021", "Rahim Uddin"),
-    ("EMP-1034", "Karim Hossain"),
-    ("EMP-1048", "Sohel Rana"),
-    ("EMP-1052", "Jamal Sheikh"),
+    ("DR9001", "Rahim Uddin"),
+    ("DR9002", "Karim Hossain"),
+    ("DR9003", "Sohel Rana"),
+    ("DR9004", "Jamal Sheikh"),
 ]
 
 PASSENGERS = [
-    ("EMP-2210", "Nadia Islam", "HR"),
-    ("EMP-2211", "Faruk Ahmed", "Merchandising"),
-    ("EMP-2212", "Tania Akter", "Accounts"),
-    ("EMP-2213", "Imran Khan", "Production"),
-    ("EMP-2214", "Shirin Sultana", "Compliance"),
-    ("EMP-2215", "Mahbub Alam", "Commercial"),
+    ("EMP2210", "Nadia Islam", "HR"),
+    ("EMP2211", "Faruk Ahmed", "Merchandising"),
+    ("EMP2212", "Tania Akter", "Accounts"),
+    ("EMP2213", "Imran Khan", "Production"),
+    ("EMP2214", "Shirin Sultana", "Compliance"),
+    ("EMP2215", "Mahbub Alam", "Commercial"),
 ]
 
 
@@ -73,21 +74,25 @@ def main() -> None:
             )
         db.execute(insert(Vehicle).values(cars).on_conflict_do_nothing(index_elements=["car_code"]))
 
-        # Drivers have no PIN yet: they set one on first sign-in (PDF 6.1).
-        db.execute(
-            insert(Driver).values(
-                [
-                    {"employee_id": e, "name": n, "phone": f"01700-0000{i}", "license_no": f"LIC-{i + 1:04d}"}
-                    for i, (e, n) in enumerate(DRIVERS)
-                ]
-            ).on_conflict_do_nothing(index_elements=["employee_id"])
-        )
+        # Sample drivers and passengers only go into an empty table (a database that already has people,
+        # perhaps under older IDs, is left alone; see app/rename_ids.py). Drivers have no PIN yet: they set
+        # one on first sign-in (PDF 6.1).
+        if not db.scalar(select(func.count()).select_from(Driver)):
+            db.execute(
+                insert(Driver).values(
+                    [
+                        {"employee_id": e, "name": n, "phone": f"01700-0000{i}", "license_no": f"LIC-{i + 1:04d}"}
+                        for i, (e, n) in enumerate(DRIVERS)
+                    ]
+                ).on_conflict_do_nothing(index_elements=["employee_id"])
+            )
 
-        db.execute(
-            insert(Passenger).values(
-                [{"employee_id": e, "name": n, "department": d} for e, n, d in PASSENGERS]
-            ).on_conflict_do_nothing(index_elements=["employee_id"])
-        )
+        if not db.scalar(select(func.count()).select_from(Passenger)):
+            db.execute(
+                insert(Passenger).values(
+                    [{"employee_id": e, "name": n, "department": d} for e, n, d in PASSENGERS]
+                ).on_conflict_do_nothing(index_elements=["employee_id"])
+            )
 
         created = []
         for username, role, pw in (("admin", "admin", admin_password), ("viewer", "viewer", viewer_password)):

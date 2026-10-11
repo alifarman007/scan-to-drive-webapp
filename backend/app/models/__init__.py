@@ -11,12 +11,12 @@ from app.models.enums import (
     VehicleStatus,
 )
 from app.models.people import AdminUser, Driver, Passenger
-from app.models.trip import Trip, TripPhoto, TripToken
+from app.models.trip import Trip, TripPhoto, TripReview, TripToken
 from app.models.vehicle import Vehicle
 
 __all__ = [
     "Alert", "Setting", "TripEvent", "OPEN_TRIP_STATUSES", "AdminRole",
     "AlertStatus", "AlertType", "RecordStatus", "TripStage", "TripStatus",
-    "VehicleStatus", "AdminUser", "Driver", "Passenger", "Trip", "TripPhoto",
+    "VehicleStatus", "AdminUser", "Driver", "Passenger", "Trip", "TripPhoto", "TripReview",
     "TripToken", "Vehicle",
 ]

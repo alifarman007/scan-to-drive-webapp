@@ -12,7 +12,9 @@ def trip_out(trip: Trip) -> dict:
         "car_model": trip.vehicle.model,
         "reg_number": trip.vehicle.reg_number,
         "driver_name": trip.driver.name,
-        "passenger_name": trip.passenger.name if trip.passenger else trip.visitor_name,
+        # employees may only have typed an ID (no staff list): then the ID is the name to show
+        "passenger_name": (trip.passenger.name or trip.passenger.employee_id) if trip.passenger else trip.visitor_name,
+        "passenger_employee_id": trip.passenger.employee_id if trip.passenger else None,
         "is_visitor": trip.is_visitor,
         "start_km": trip.start_km,
         "end_km": trip.end_km,

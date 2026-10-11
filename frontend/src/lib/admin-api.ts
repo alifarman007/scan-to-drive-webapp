@@ -56,6 +56,13 @@ export type Alert = {
   created_at: string;
 };
 
+export type ReviewTagKey =
+  | "safe_driving" | "on_time" | "clean_car" | "polite_driver" | "smooth_ride"
+  | "rough_driving" | "late" | "dirty_car" | "impolite" | "phone_while_driving";
+
+/** A passenger's rating of a finished trip. */
+export type Review = { rating: number; tags: ReviewTagKey[]; comment: string | null; at: string };
+
 export type Dashboard = {
   as_of: string;
   today: string;
@@ -68,6 +75,13 @@ export type Dashboard = {
     open_alerts: number;
   };
   car_board: BoardCar[];
+  ratings: {
+    average_this_month: number | null;
+    count_this_month: number;
+    /** how many 1-star ... 5-star ratings this month */
+    stars_this_month: number[];
+    recent: (Review & { trip_id: number; trip_no: string; driver_name: string })[];
+  };
   live_trips: LiveTrip[];
   alerts: Alert[];
   charts: {
@@ -88,6 +102,8 @@ export type HistoryTrip = LiveTrip & {
   approval_note: string | null;
   approved_at: string | null;
   reg_number: string;
+  /** the passenger's star rating, if they gave one */
+  rating?: number | null;
 };
 
 export type TripPage = { total: number; total_km: number; limit: number; offset: number; trips: HistoryTrip[] };
@@ -109,13 +125,14 @@ export type TimelineEvent = {
 export type TripDetail = {
   trip: HistoryTrip & {
     driver: { id: number; employee_id: string; name: string; phone: string | null };
-    passenger: { id: number; employee_id: string; name: string; department: string | null } | null;
+    passenger: { id: number; employee_id: string; name: string | null; department: string | null } | null;
     visitor: { name: string; phone: string; reason: string | null } | null;
     vehicle: { id: number; car_code: string; model: string; reg_number: string };
     map_points: { start: { lat: number; lng: number } | null; end: { lat: number; lng: number } | null };
     photos: { start: { url: string | null }; end: { url: string | null } };
     approved_by_name: string | null;
     lock: { stage: "start" | "end"; locked: boolean; tries_left: number } | null;
+    review: Review | null;
   };
   timeline: TimelineEvent[];
   alerts: Alert[];

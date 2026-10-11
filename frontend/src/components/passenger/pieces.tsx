@@ -4,7 +4,6 @@ import {
   ArrowsClockwiseIcon,
   CheckCircleIcon,
   ClockCountdownIcon,
-  HourglassMediumIcon,
   ImageIcon,
   LockKeyIcon,
   ProhibitIcon,
@@ -15,14 +14,16 @@ import {
 import { AnimatePresence, motion, useAnimate } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Dialog } from "radix-ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
 import { ApiError, NETWORK_ERROR } from "@/lib/api";
 import { useNowSeconds } from "@/lib/hooks";
-import { DEAD_CODES } from "@/lib/passenger-api";
+import { DEAD_CODES, openTripOnThisPhone } from "@/lib/passenger-api";
 import { cn } from "@/lib/utils";
+
+import { ScanEndButton } from "./scan-end";
 
 /** The navy card with the trip: car, driver, from and to, time. */
 export function TripCard({
@@ -162,36 +163,58 @@ const DEAD_LOOK: Record<string, { Icon: typeof ProhibitIcon; tone: "ok" | "wait"
   QR_REPLACED: { Icon: ArrowsClockwiseIcon, tone: "wait" },
   OFFLINE: { Icon: WifiSlashIcon, tone: "wait" },
   QR_BLOCKED: { Icon: LockKeyIcon, tone: "bad" },
-  TOO_MANY_LOOKUPS: { Icon: HourglassMediumIcon, tone: "bad" },
   TRIP_CANCELLED: { Icon: ProhibitIcon, tone: "bad" },
   OTHER: { Icon: ProhibitIcon, tone: "wait" },
 };
 
-/** The code cannot be used (expired, used, replaced, blocked, cancelled ...): one clear message, what to do next. */
+const noSubscribe = () => () => {};
+
+/**
+ * The code cannot be used (expired, used, replaced, blocked, cancelled ...): one clear message, what to do next.
+ * A start code opened again later on the phone that confirmed it ("already used") also offers the end scan.
+ */
 export function DeadCode({ code }: { code: string }) {
   const t = useTranslations("passenger.dead");
-  const key = ["QR_INVALID", "WRONG_QR", "QR_USED", "TRIP_CANCELLED", "QR_BLOCKED", "QR_REPLACED", "QR_EXPIRED", "TRIP_NOT_WAITING", "TOO_MANY_LOOKUPS", "OFFLINE"].includes(code)
+  const tp = useTranslations("passenger");
+  const key = ["QR_INVALID", "WRONG_QR", "QR_USED", "TRIP_CANCELLED", "QR_BLOCKED", "QR_REPLACED", "QR_EXPIRED", "TRIP_NOT_WAITING", "OFFLINE"].includes(code)
     ? code
     : "OTHER";
   const { Icon, tone } = DEAD_LOOK[key] ?? DEAD_LOOK.OTHER;
+  // this browser's storage (the server sees nothing there, so the button appears after hydration)
+  const raw = useSyncExternalStore(
+    noSubscribe,
+    () => (key === "QR_USED" ? openTripOnThisPhone.raw() : null),
+    () => null,
+  );
+  const openTrip = useMemo(() => openTripOnThisPhone.parse(raw), [raw]);
   return (
-    <Reveal>
-      <Card className="flex flex-col items-start gap-3 border-0 p-6 shadow-lift">
-        <motion.span
-          className={cn(
-            "inline-flex size-14 items-center justify-center rounded-2xl",
-            tone === "ok" ? "bg-ok-bg text-ok-fg" : tone === "bad" ? "bg-bad-bg text-bad-fg" : "bg-wait-bg text-wait-fg",
-          )}
-          initial={{ rotate: -12, scale: 0.8 }}
-          animate={{ rotate: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 400, damping: 14 }}
-        >
-          <Icon size={28} weight="duotone" />
-        </motion.span>
-        <h1 className="font-display text-2xl font-bold text-title">{t(`${key}.title`)}</h1>
-        <p className="text-muted">{t(`${key}.body`)}</p>
-      </Card>
-    </Reveal>
+    <div className="flex flex-col gap-4">
+      <Reveal>
+        <Card className="flex flex-col items-start gap-3 border-0 p-6 shadow-lift">
+          <motion.span
+            className={cn(
+              "inline-flex size-14 items-center justify-center rounded-2xl",
+              tone === "ok" ? "bg-ok-bg text-ok-fg" : tone === "bad" ? "bg-bad-bg text-bad-fg" : "bg-wait-bg text-wait-fg",
+            )}
+            initial={{ rotate: -12, scale: 0.8 }}
+            animate={{ rotate: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 14 }}
+          >
+            <Icon size={28} weight="duotone" />
+          </motion.span>
+          <h1 className="font-display text-2xl font-bold text-title">{t(`${key}.title`)}</h1>
+          <p className="text-muted">{t(`${key}.body`)}</p>
+        </Card>
+      </Reveal>
+      <AnimatePresence>
+        {openTrip ? (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3">
+            <p className="text-sm text-muted">{tp("onTripNow", { car: openTrip.car_code })}</p>
+            <ScanEndButton />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -234,10 +257,10 @@ export function useErrorText(typed: "id" | "phone" = "id") {
       onDead("QR_BLOCKED");
       return null;
     }
-    if (err.code === "ID_NOT_FOUND") return left !== null ? t("idNotFoundLeft", { left }) : t("idNotFound");
+    if (err.code === "BAD_ID_FORMAT") return t("BAD_ID_FORMAT");
     if (err.code === "ID_MISMATCH" && typed === "phone") return left !== null ? t("phoneMismatchLeft", { left }) : t("phoneMismatch");
     if (err.code === "ID_MISMATCH") return left !== null ? t("mismatchLeft", { left }) : t("mismatch");
-    if (["DRIVER_CANNOT_CONFIRM", "PASSENGER_IS_DRIVER", "VISITORS_NOT_ALLOWED", "WRONG_PASSENGER_TYPE", "NAME_REQUIRED"].includes(err.code)) return t(err.code);
+    if (["DRIVER_CANNOT_CONFIRM", "PASSENGER_IS_DRIVER", "PASSENGER_INACTIVE", "VISITORS_NOT_ALLOWED", "WRONG_PASSENGER_TYPE", "NAME_REQUIRED"].includes(err.code)) return t(err.code);
     if (err.status === 422) return t("checkFields");
     return t("generic");
   };

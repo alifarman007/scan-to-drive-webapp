@@ -1,10 +1,11 @@
-import { ChartLineUpIcon, CheckCircleIcon, MapPinLineIcon } from "@phosphor-icons/react/ssr";
+import { ChartLineUpIcon, CheckCircleIcon, MapPinLineIcon, QrCodeIcon } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 import { AdminLogin } from "@/components/admin/admin-login";
 import { Wordmark } from "@/components/brand";
+import { Road } from "@/components/road";
 import { Card } from "@/components/ui/card";
 import { LanguageSwitch } from "@/components/ui/language-switch";
 import { Reveal, Stagger, StaggerItem } from "@/components/ui/reveal";
@@ -77,44 +78,17 @@ export default async function AdminLoginPage({ searchParams }: Props) {
               <AdminLogin next={next} expired={params.expired === "1"} />
             </Card>
           </Reveal>
-          <div className="mt-6 flex items-center justify-between gap-3 lg:hidden">
-            <Link href="/driver" className="text-sm font-semibold text-accent">
-              {t("adminAuth.driverLink")}
-            </Link>
-            <ThemeToggle />
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-sm text-muted lg:mx-auto">
+              <QrCodeIcon size={18} weight="duotone" className="shrink-0 text-accent" />
+              {t("adminAuth.driverNote")}
+            </p>
+            <div className="lg:hidden">
+              <ThemeToggle />
+            </div>
           </div>
-          <p className="mt-6 hidden text-center text-sm lg:block">
-            <Link href="/driver" className="font-semibold text-accent">
-              {t("adminAuth.driverLink")}
-            </Link>
-          </p>
         </div>
       </section>
     </div>
-  );
-}
-
-/** A soft road curve with dashes drifting along it, behind the brand panel. */
-function Road() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" className="pointer-events-none absolute inset-0 h-full w-full opacity-60">
-      <defs>
-        <linearGradient id="road-fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#284dae" stopOpacity="0" />
-          <stop offset="0.5" stopColor="#284dae" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#284dae" stopOpacity="0.15" />
-        </linearGradient>
-      </defs>
-      <path d="M640 -40 C 420 160, 560 360, 330 520 S 120 760, -60 860" fill="none" stroke="url(#road-fade)" strokeWidth="120" strokeLinecap="round" />
-      <path
-        d="M640 -40 C 420 160, 560 360, 330 520 S 120 760, -60 860"
-        fill="none"
-        stroke="#9fb4f5"
-        strokeOpacity="0.55"
-        strokeWidth="3"
-        strokeDasharray="18 22"
-        className="road-dash"
-      />
-    </svg>
   );
 }

@@ -15,6 +15,7 @@ const KNOWN = new Set([
   "trip_started", "trip_started_unconfirmed", "journey_started", "trip_end_submitted", "trip_completed",
   "trip_completed_unconfirmed", "trip_cancelled", "trip_closed_by_admin", "trip_unlocked", "trip_approved", "trip_rejected",
   "start_qr_renewed", "end_qr_renewed", "passenger_lookup", "passenger_wrong_id", "qr_blocked", "alert_solved",
+  "trip_reviewed",
 ]);
 
 /** Colour of the dot: who did the step. Problems (wrong IDs, blocks, cancel, reject) are red whoever did them. */
@@ -78,6 +79,7 @@ export function Timeline({ events, visitorName }: { events: TimelineEvent[]; vis
 
 function Step({ event: e, last, dot, visitorName }: { event: TimelineEvent; last: boolean; dot: string; visitorName: string | null }) {
   const t = useTranslations("tripDetail.timeline");
+  const tt = useTranslations("reviewTags");
   const format = useFormatter();
   const [open, setOpen] = useState(false);
   const device = deviceName(e.device);
@@ -112,6 +114,11 @@ function Step({ event: e, last, dot, visitorName }: { event: TimelineEvent; last
   if (str("stage")) notes.push(t("note.stage", { stage: t(`stage.${str("stage")}`) }));
   if (d.identified_at_end === true) notes.push(t("note.identifiedAtEnd"));
   if (str("visitor") && e.event === "journey_started") notes.push(t("note.visitor", { name: str("visitor")! }));
+  if (d.same_phone === true) notes.push(t("note.samePhone"));
+  if (e.event === "trip_reviewed" && num("rating") !== null) {
+    const tags = Array.isArray(d.tags) ? (d.tags as string[]).filter((x) => typeof x === "string") : [];
+    notes.push(t("note.rating", { rating: num("rating")! }) + (tags.length ? ` · ${tags.map((x) => tt.has(x) ? tt(x) : x).join(", ")}` : ""));
+  }
 
   return (
     <div className="relative flex gap-3 pb-5">
