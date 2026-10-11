@@ -1,6 +1,6 @@
 "use client";
 
-import { CaretDownIcon, CircleNotchIcon, EyeIcon, MagnifyingGlassIcon, SignOutIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CircleNotchIcon, EyeIcon, MagnifyingGlassIcon, SignOutIcon, UserCircleGearIcon } from "@phosphor-icons/react";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -256,6 +256,15 @@ export function UserMenu({ user, tone = "onLight" }: { user: AdminUser; tone?: "
             <span className="text-xs text-muted">{user.role === "admin" ? t("roleAdminHint") : t("roleViewerHint")}</span>
           </div>
           <DropdownMenu.Separator className="mx-1 my-1 h-px bg-border" />
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/admin/users"
+              className="flex h-11 cursor-pointer items-center gap-3 rounded-xl px-3 text-sm font-semibold text-title outline-none data-highlighted:bg-soft"
+            >
+              <UserCircleGearIcon size={18} weight="bold" className="text-accent" />
+              {t("myAccount")}
+            </Link>
+          </DropdownMenu.Item>
           <DropdownMenu.Item
             onSelect={(e) => {
               e.preventDefault();

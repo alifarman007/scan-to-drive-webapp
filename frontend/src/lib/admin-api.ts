@@ -111,6 +111,37 @@ export type Driver = {
   created_at: string;
 };
 
+export type AdminAccount = AdminUser & {
+  status: "active" | "inactive";
+  created_at: string;
+  last_sign_in: string | null;
+  is_me: boolean;
+};
+
+export type SettingKey =
+  | "qr_expiry_minutes" | "wrong_id_limit" | "long_trip_hours" | "km_gap_limit_km"
+  | "waiting_too_long_minutes" | "high_km_limit_km" | "allow_cant_scan" | "allow_visitors";
+
+export type SettingRow = {
+  key: SettingKey;
+  value: number;
+  default: number;
+  min: number;
+  max: number;
+  label: string;
+  updated_at: string | null;
+  updated_by_name: string | null;
+};
+
+export type SettingsChange = {
+  at: string;
+  by: string;
+  event: "settings_changed" | "purposes_changed";
+  detail: Record<string, { from: number; to: number }> | { from: string[]; to: string[] } | null;
+};
+
+export type SettingsPage = { settings: SettingRow[]; purposes: string[]; history: SettingsChange[] };
+
 export type DriverDetail = { driver: Driver; recent_trips: HistoryTrip[]; km_by_day: DayActivity[] };
 
 export type ReviewTagKey =
@@ -216,6 +247,18 @@ export const adminApi = {
   updateDriver: (id: number, changes: Partial<Pick<Driver, "name" | "phone" | "license_no" | "status">>) =>
     api<{ driver: Driver }>(`/admin/drivers/${id}`, { method: "PATCH", json: changes }),
   resetPin: (id: number) => api<{ driver: Driver }>(`/admin/drivers/${id}/reset-pin`, { method: "POST" }),
+
+  addUser: (u: { username: string; role: AdminUser["role"]; password: string }) => api<{ user: AdminAccount }>("/admin/users", { json: u }),
+  updateUser: (id: number, changes: { role?: AdminUser["role"]; status?: "active" | "inactive" }) =>
+    api<{ user: AdminAccount }>(`/admin/users/${id}`, { method: "PATCH", json: changes }),
+  resetPassword: (id: number, newPassword: string) =>
+    api(`/admin/users/${id}/reset-password`, { json: { new_password: newPassword } }),
+  changeMyPassword: (current: string, next: string) =>
+    api("/admin/users/me/password", { json: { current_password: current, new_password: next } }),
+
+  saveSettings: (values: Partial<Record<SettingKey, number>>) =>
+    api<{ changed: Record<string, { from: number; to: number }> } & SettingsPage>("/admin/settings", { method: "PATCH", json: { values } }),
+  savePurposes: (purposes: string[]) => api<{ purposes: string[] }>("/admin/settings/purposes", { method: "PUT", json: { purposes } }),
 };
 
 /** The printable sticker (PDF). `inline`: open in the browser instead of downloading. */

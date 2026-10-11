@@ -627,7 +627,8 @@
     "roleViewer": "Viewer",
     "roleAdminHint": "Can change trips, cars, people and settings.",
     "roleViewerHint": "Can look at everything, but not change it.",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "myAccount": "My account"
   },
   "trips": {
     "title": "Trip history",
@@ -1135,5 +1136,185 @@
     "noneSolvedBody": "Solved alerts show up here, with who solved them and the note.",
     "noneFilteredTitle": "No alert matches",
     "noneFilteredBody": "Try another kind, car or search."
+  },
+  "users": {
+    "title": "Users",
+    "summary": "{active} active {active, plural, one {account} other {accounts}} of {total}",
+    "summaryViewer": "Your account",
+    "add": "Add account",
+    "you": "You",
+    "off": "Turned off",
+    "lastSignIn": "Last signed in {time}",
+    "neverSignedIn": "Has not signed in yet",
+    "roleLabel": "Role of {name}",
+    "roleSaved": "{name}'s role changed",
+    "roles": {
+      "admin": "Admin",
+      "viewer": "Viewer",
+      "adminHint": "Can change everything",
+      "viewerHint": "Can look, cannot change",
+      "adminLong": "Sees everything and can change it: trips, cars, drivers, users and settings.",
+      "viewerLong": "Sees the dashboard, trips, cars, drivers and alerts, but cannot change anything. Good for managers."
+    },
+    "changeMine": "Change my password",
+    "setPassword": "Set a new password",
+    "turnOff": "Turn off",
+    "turnOn": "Turn on",
+    "offSaved": "{name} turned off",
+    "onSaved": "{name} turned on again",
+    "me": {
+      "change": "Change my password",
+      "save": "Save new password",
+      "cancel": "Cancel",
+      "changed": "Your password is changed"
+    },
+    "reset": {
+      "title": "New password for {name}",
+      "hint": "Their old password stops working. Already signed-in browsers stay signed in until the session ends.",
+      "mineHint": "Type your current password first.",
+      "tell": "Tell them the new password in person or by phone, and ask them to change it after signing in.",
+      "save": "Set password",
+      "done": "{name} has a new password"
+    },
+    "password": {
+      "new": "New password",
+      "current": "Current password",
+      "again": "New password again",
+      "show": "Show password",
+      "hide": "Hide password",
+      "copy": "Copy",
+      "make": "Make a strong one for me",
+      "tooShort": "At least 8 characters.",
+      "tooLong": "Too long (72 bytes at most).",
+      "needed": "Please type it.",
+      "mismatch": "The two passwords are different.",
+      "strength0": "Too weak",
+      "strength1": "Weak",
+      "strength2": "Fair",
+      "strength3": "Good",
+      "strength4": "Strong"
+    },
+    "form": {
+      "title": "Add an account",
+      "hint": "For someone in the transport office or a manager.",
+      "username": "Username",
+      "usernameHint": "Letters, digits, dot, dash or underscore. Used to sign in.",
+      "usernameBad": "3 to 60 letters, digits, dots, dashes or underscores.",
+      "role": "What can they do?",
+      "password": "First password",
+      "add": "Add account"
+    },
+    "created": {
+      "title": "Account ready",
+      "hint": "The password is not shown again. Send it now.",
+      "password": "Password",
+      "tip": "Ask them to change the password after the first sign-in (account menu, My account).",
+      "message": "Scan-to-Drive sign-in: {url}\nUsername: {username}\nPassword: {password}\nPlease change your password after signing in.",
+      "copy": "Copy sign-in details",
+      "copied": "Copied",
+      "done": "Done"
+    },
+    "errors": {
+      "USERNAME_TAKEN": "This username is already used.",
+      "CANNOT_CHANGE_SELF": "You cannot take away your own admin access.",
+      "LAST_ADMIN": "There must be at least one active admin.",
+      "WRONG_PASSWORD": "The current password is not correct.",
+      "check": "Please check what you typed.",
+      "network": "No connection. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "summary": "How the app behaves for drivers, passengers and alerts. Every change is kept in the log.",
+    "viewOnly": "You can look at the settings. Only an admin can change them.",
+    "unsaved": "{count, plural, one {# unsaved change} other {# unsaved changes}}",
+    "undo": "Undo",
+    "save": "Save changes",
+    "saved": "{count, plural, one {Change saved} other {# changes saved}}",
+    "saveFailed": "Could not save. Check the values and try again.",
+    "default": "Default {value} {unit}",
+    "useDefault": "Use default",
+    "changedBy": "Changed by {name} on {date}",
+    "sections": {
+      "qr": {
+        "title": "Passenger QR codes",
+        "hint": "The one-time codes on the driver's phone."
+      },
+      "passengers": {
+        "title": "Passengers",
+        "hint": "Who can confirm a trip, and what the driver can do when they cannot."
+      },
+      "alerts": {
+        "title": "Alerts",
+        "hint": "When the checks (every minute) warn the office."
+      }
+    },
+    "items": {
+      "qr_expiry_minutes": {
+        "title": "Code lifetime",
+        "unit": "{n, plural, one {minute} other {minutes}}",
+        "sentence": "A code works for <b>{n} min</b> after the driver shows it. Then the driver makes a new one."
+      },
+      "wrong_id_limit": {
+        "title": "Wrong ID limit",
+        "unit": "{n, plural, one {try} other {tries}}",
+        "sentence": "After <b>{n}</b> wrong IDs the code locks, and the office unlocks it."
+      },
+      "allow_visitors": {
+        "title": "Visitors",
+        "unit": "",
+        "on": "<b>On</b>: people who are not Epic employees confirm with their name and phone number.",
+        "off": "<b>Off</b>: only Epic employees, with their employee ID."
+      },
+      "allow_cant_scan": {
+        "title": "\"Passenger can't scan\"",
+        "unit": "",
+        "on": "<b>On</b>: the driver can go on without the passenger's scan; the office approves the trip later.",
+        "off": "<b>Off</b>: every trip with a passenger needs the passenger's scan."
+      },
+      "long_trip_hours": {
+        "title": "Long trip",
+        "unit": "{n, plural, one {hour} other {hours}}",
+        "sentence": "Alert when a trip is still running after <b>{n} h</b>."
+      },
+      "waiting_too_long_minutes": {
+        "title": "Waiting too long",
+        "unit": "{n, plural, one {minute} other {minutes}}",
+        "sentence": "Alert when a QR waits for the passenger longer than <b>{n} min</b>."
+      },
+      "km_gap_limit_km": {
+        "title": "Km gap",
+        "unit": "km",
+        "sentence": "Alert when a trip starts more than <b>{n} km</b> above where the car's last trip ended."
+      },
+      "high_km_limit_km": {
+        "title": "High km",
+        "unit": "km",
+        "sentence": "Alert when one trip is longer than <b>{n} km</b>."
+      }
+    },
+    "purposes": {
+      "title": "Trip purposes",
+      "hint": "What drivers pick from when there is no passenger. They can still type their own.",
+      "addLabel": "New purpose",
+      "addPlaceholder": "For example: Fuel and car wash",
+      "add": "Add",
+      "dup": "Already in the list.",
+      "full": "30 purposes at most",
+      "dragHint": "Drag the handle to change the order. The first ones come first on the driver's list.",
+      "drag": "Move {name}",
+      "remove": "Remove {name}",
+      "bad": "Each purpose must be 1 to 60 characters."
+    },
+    "history": {
+      "title": "Recent changes",
+      "hint": "Who changed what.",
+      "empty": "Nothing changed yet. All settings are at their defaults.",
+      "purposes": "Changed the trip purposes",
+      "on": "on",
+      "off": "off"
+    },
+    "saveShort": "Save"
   }
 }

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import current_admin_user, current_principal, get_db, require_admin
 from app.errors import api_error
-from app.models import AdminUser, Setting
+from app.models import AdminUser, Setting, TripEvent
 from app.services.audit import log_event
 from app.services.settings import DEFAULTS, SPECS, get_int, get_purposes
 
@@ -23,6 +23,7 @@ class SettingsUpdate(BaseModel):
 
 def _rows(db: Session) -> list[dict]:
     saved = {s.key: s for s in db.scalars(select(Setting))}
+    names = dict(db.execute(select(AdminUser.id, AdminUser.username)).all())
     out = []
     for key, default in DEFAULTS.items():
         lo, hi, label = SPECS[key]
@@ -31,14 +32,22 @@ def _rows(db: Session) -> list[dict]:
             "key": key, "value": get_int(db, key), "default": default, "min": lo, "max": hi, "label": label,
             "updated_at": row.updated_at if row else None,
             "updated_by": row.updated_by if row else None,
+            "updated_by_name": names.get(row.updated_by) if row and row.updated_by else None,
         })
     return out
+
+
+def _history(db: Session, limit: int = 12) -> list[dict]:
+    """The latest changes to settings and purposes, newest first (from the audit log)."""
+    rows = db.scalars(select(TripEvent).where(TripEvent.event.in_(("settings_changed", "purposes_changed")))
+                      .order_by(TripEvent.created_at.desc(), TripEvent.id.desc()).limit(limit)).all()
+    return [{"at": e.created_at, "by": e.actor.partition(":")[2] or e.actor, "event": e.event, "detail": e.detail} for e in rows]
 
 
 @router.get("")
 def list_settings(_: AdminUser = Depends(current_admin_user), db: Session = Depends(get_db)):
     """All settings with current value, default and allowed range. Viewers may look."""
-    return {"settings": _rows(db), "purposes": get_purposes(db)}
+    return {"settings": _rows(db), "purposes": get_purposes(db), "history": _history(db)}
 
 
 @router.patch("")
@@ -72,7 +81,7 @@ def change_settings(
     if changed:
         log_event(db, request, "settings_changed", f"admin:{admin.username}", detail=changed)
     db.commit()
-    return {"changed": changed, "settings": _rows(db)}
+    return {"changed": changed, "settings": _rows(db), "history": _history(db)}
 
 
 class PurposesUpdate(BaseModel):

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.deps import current_admin_user, get_db, require_admin
 from app.errors import api_error
-from app.models import AdminRole, AdminUser, RecordStatus
+from app.models import AdminRole, AdminUser, RecordStatus, TripEvent
 from app.security import hash_secret, verify_secret
 from app.services.audit import log_event
 
@@ -70,9 +70,14 @@ def _active_admin_count(db: Session) -> int:
 
 
 @router.get("")
-def list_users(_: AdminUser = Depends(require_admin), db: Session = Depends(get_db)):
+def list_users(me: AdminUser = Depends(require_admin), db: Session = Depends(get_db)):
+    """All accounts, with when each last signed in (from the audit log) and which one is you."""
     users = db.scalars(select(AdminUser).order_by(AdminUser.username)).all()
-    return {"total": len(users), "items": [user_out(u) for u in users]}
+    last = dict(db.execute(
+        select(TripEvent.actor, func.max(TripEvent.created_at)).where(TripEvent.event == "admin_login").group_by(TripEvent.actor)
+    ).all())
+    return {"total": len(users), "items": [
+        {**user_out(u), "last_sign_in": last.get(f"admin:{u.username.lower()}"), "is_me": u.id == me.id} for u in users]}
 
 
 @router.post("", status_code=201)

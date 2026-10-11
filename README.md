@@ -790,6 +790,43 @@ Frontend:
 - [ ] To verify on the laptop: add a car and print its sticker (check the size on paper), scan it with a phone; add a driver and sign in with
       the new ID on a phone; solve an alert.
 
+### 2026-10-11 (frontend step 8: users and settings)
+
+Backend (no database change):
+- [x] Users list: when each account last signed in (from the audit log) and which one is you.
+- [x] Settings: who changed each setting (name), and `history`: the last 12 changes to settings and trip purposes (who, when, from, to).
+- [x] 299 tests pass (2 new).
+
+Frontend:
+- [x] Users `/admin/users`:
+  - Every account with its colour avatar, "You", last sign-in ("Last signed in 5 minutes ago" or "Has not signed in yet"), and an
+    Admin / Viewer switch. You cannot take away your own admin access, and there is always at least one active admin (the page says so).
+  - "Set a new password" (with "Make a strong one for me" and a strength bar), "Turn off" / "Turn on".
+  - "Add account": username (checked against the ones already there), role picked from two cards (Admin: can change everything;
+    Viewer: can look only), a strong password already filled in. After adding, a card shows the sign-in details once with
+    "Copy sign-in details" (address, username, password) to send to the person.
+  - My account card (and "My account" in the account menu): change your own password (current, new, again, strength bar).
+  - Viewers only see their own account and can change their password.
+- [x] Settings `/admin/settings`:
+  - Grouped: Passenger QR codes (code lifetime, wrong ID limit), Passengers (visitors on/off, "Passenger can't scan" on/off), Alerts
+    (long trip, waiting too long, km gap, high km), Trip purposes.
+  - Each setting says what it does with the value in the sentence ("A code works for 15 min after the driver shows it"), has a
+    - / + box (type a number, arrow keys work, kept inside the allowed range), quick picks, the default with "Use default", and who
+    changed it last. Switches for on/off.
+  - Trip purposes: drag to reorder, remove, add (no duplicates, 30 at most).
+  - Changes are collected: a bar rises from the bottom with "3 unsaved changes", Undo and Save; changed settings get an amber mark.
+    Leaving the page with unsaved changes asks first. Edits made while the page is reloading after a save are kept.
+  - Recent changes on the right: who changed what, from and to.
+  - Viewers see everything with the controls turned off and a note that only an admin can change settings.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox (laptop, phone, dark, Bangla): own role refused, add an account (taken name refused, generated password,
+      copy details), the new viewer signs in, sees settings read-only and only their own account, wrong current password refused then
+      changed, last sign-in shown, role up and down, short password refused, new password, turn off / on; settings stepper, undo,
+      out-of-range clamped, switches, add and remove a purpose, duplicate refused, save several at once, history, the driver's purposes
+      list updated. No sideways scrolling on phones. No browser errors. Lint, types and build pass.
+- [ ] To verify on the laptop: add a viewer account for someone, sign in with it in another browser; change a setting (for example
+      code lifetime) and check it on the driver's QR screen.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -950,12 +987,12 @@ npm run start:lan             # run the production build for phones (faster than
 | POST | `/api/admin/passengers` | admin | add an employee |
 | PATCH | `/api/admin/passengers/{id}` | admin | edit employee, set active / inactive |
 | POST | `/api/admin/passengers/import` | admin | import or update employees from an Excel file (`?dry_run=true` to preview) |
-| GET | `/api/admin/users` | admin | list admin and viewer accounts |
+| GET | `/api/admin/users` | admin | list admin and viewer accounts, with last sign-in and which one is you |
 | POST | `/api/admin/users` | admin | add an account |
 | PATCH | `/api/admin/users/{id}` | admin | change role, set active / inactive |
 | POST | `/api/admin/users/{id}/reset-password` | admin | set a new password for someone |
 | POST | `/api/admin/users/me/password` | admin / viewer | change my own password |
-| GET | `/api/admin/settings` | admin / viewer | all settings with value, default and allowed range |
+| GET | `/api/admin/settings` | admin / viewer | all settings with value, default, allowed range, who changed it; purposes; recent changes |
 | PATCH | `/api/admin/settings` | admin | change one or more settings (logged) |
 | GET | `/api/admin/reports` | admin / viewer | the seven ready reports |
 | GET | `/api/admin/reports/{name}` | admin / viewer | one report; filters `date_from`, `date_to`, `range`, `car_id`, `driver_id`, `department`; `format=json|xlsx|pdf` |
@@ -1052,6 +1089,7 @@ frontend/                  Next.js app
   src/components/passenger/identity-forms.tsx "who are you" forms (employee ID + optional name, visitor), used on both pages
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
+  src/components/admin/office/ users page (users.tsx) and settings page (settings.tsx)
   src/components/admin/fleet/ cars, drivers and alerts pages (cars.tsx, drivers.tsx, alerts.tsx) and their shared pieces (shared.tsx)
   src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, two charts
   src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail
@@ -1069,9 +1107,9 @@ frontend/                  Next.js app
 
 ## Next steps
 
-1. Verify the unchecked items above (2026-10-11 changes and step 7) on the laptop and phones, and commit.
-2. Frontend step 8: users (accounts, passwords) and settings (QR expiry, limits, visitors, purposes). Reports stay hidden for now.
-3. Then step 9: polish, phone test over HTTPS, Docker and Azure.
+1. Verify the unchecked items above (step 7 and step 8) on the laptop and phones, and commit.
+2. Step 9: polish, a full phone test over HTTPS, then Docker and Azure.
+3. Later, when wanted: Reports, Passengers, Audit log and Driver overtime pages (hidden in the menus now).
 4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
 5. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
 

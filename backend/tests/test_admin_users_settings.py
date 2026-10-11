@@ -173,3 +173,21 @@ def test_settings_validation_and_viewer_blocked(client, db):
     # one bad value means nothing is saved
     bad = client.patch("/api/admin/settings", headers=h, json={"values": {"wrong_id_limit": keep + 1, "qr_expiry_minutes": 0}})
     assert bad.status_code == 422 and get_int(db, "wrong_id_limit") == keep
+
+
+def test_users_list_shows_last_sign_in_and_me(client, db):
+    admin = make_user(db, AdminRole.admin)
+    other = make_user(db, AdminRole.viewer)
+    assert client.post("/api/auth/admin/login", json={"username": other.username.upper(), "password": "correct-horse"}).status_code == 200
+    items = {u["id"]: u for u in client.get("/api/admin/users", headers=auth(admin)).json()["items"]}
+    assert items[admin.id]["is_me"] is True and items[other.id]["is_me"] is False
+    assert items[other.id]["last_sign_in"] is not None
+
+
+def test_settings_history_and_who_changed(client, db):
+    admin = make_user(db, AdminRole.admin)
+    r = client.patch("/api/admin/settings", json={"values": {"wrong_id_limit": 7}}, headers=auth(admin)).json()
+    row = next(x for x in r["settings"] if x["key"] == "wrong_id_limit")
+    assert row["value"] == 7 and row["updated_by_name"] == admin.username
+    h = client.get("/api/admin/settings", headers=auth(admin)).json()["history"]
+    assert h[0]["event"] == "settings_changed" and h[0]["by"] == admin.username and h[0]["detail"]["wrong_id_limit"]["to"] == 7
