@@ -55,7 +55,17 @@ export default async function CarRoute({ params, searchParams }: Props) {
   // This driver's open trip is on this car: go straight to it.
   if (mine && mine.car_code === page.car.car_code) redirect("/driver/trip");
 
-  const header = <CarHeader page={page} label={t("lastEndKm")} status={t(`carStatus.${page.car.status}`)} startTitle={t("startTitle")} />;
+  // a car on someone else's trip says so in its header too (not "Available")
+  const inUse = page.blocked?.code === "CAR_IN_USE";
+  const header = (
+    <CarHeader
+      page={page}
+      label={t("lastEndKm")}
+      status={inUse ? t("carStatus.in_use") : t(`carStatus.${page.car.status}`)}
+      inUse={inUse}
+      startTitle={t("startTitle")}
+    />
+  );
 
   if (mine) {
     return (
@@ -94,7 +104,7 @@ export default async function CarRoute({ params, searchParams }: Props) {
   );
 }
 
-function CarHeader({ page, label, status, startTitle }: { page: CarPage; label: string; status: string; startTitle: string }) {
+function CarHeader({ page, label, status, inUse, startTitle }: { page: CarPage; label: string; status: string; inUse: boolean; startTitle: string }) {
   const { car } = page;
   return (
     <Reveal className="flex items-end justify-between gap-3">
@@ -104,7 +114,7 @@ function CarHeader({ page, label, status, startTitle }: { page: CarPage; label: 
         <p className="truncate text-sm text-[#c9d3ea]">
           {car.model} · {car.reg_number}
         </p>
-        <StatusChip status={car.status === "active" ? "available" : "maintenance"} size="sm" className="mt-1 w-fit">
+        <StatusChip status={inUse ? "on_trip" : car.status === "active" ? "available" : "maintenance"} live={inUse} size="sm" className="mt-1 w-fit">
           {status}
         </StatusChip>
       </div>

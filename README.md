@@ -827,6 +827,58 @@ Frontend:
 - [ ] To verify on the laptop: add a viewer account for someone, sign in with it in another browser; change a setting (for example
       code lifetime) and check it on the driver's QR screen.
 
+### 2026-10-11 (step 9: polish, dashboard photos ready for reading the km later) - end of Phase 1
+
+Backend (migration 0006):
+- [x] Every dashboard photo is now cleaned on the server before it is saved (`app/services/photos.py`), whatever phone took it:
+  - turned upright (phones often save portrait photos sideways with a "rotate" note inside the file),
+  - longest side at most 2048 px (enough for the odometer digits, nothing is made bigger),
+  - saved as JPEG quality 88 with full colour detail (no colour blur around the thin digits), so every photo has the same size and
+    quality for the km reading (OCR) planned later,
+  - hidden data removed (GPS position, phone model, time; the trip already keeps its own GPS and server time),
+  - PNG or transparent pictures are put on white; a file that is not a picture (or is broken) is refused with "That file is not a
+    photo. Take the photo with the camera."
+- [x] Saved with each photo: width, height, size, the size that was uploaded, and a fingerprint (sha256). Files are now always
+      `trips/{id}/start.jpg` and `end.jpg`.
+- [x] The same photo used again (on another trip, or as both start and end photo of one trip) is found by the fingerprint and shown on
+      the trip page.
+- [x] Upload limit `MAX_PHOTO_MB` is now 12 (was 5): the browser already shrinks the photo, and the server shrinks it again anyway.
+- [x] `python -m app.recompress_photos` brings photos saved before this change to the same standard (shows what it would do; add
+      `--apply` to do it). Safe to run twice. In the sandbox: 122 photos, 7.5 MB before, 3.9 MB after.
+- [x] Trip detail API: each photo has `width`, `height`, `size_bytes`, `original_bytes` and `reused_on` (the other trip with the same photo).
+- [x] 308 tests pass (9 new in `tests/test_photos.py`: shrink, upright, hidden data gone, PNG, full colour detail, not a picture, details
+      saved, same photo on two trips, same photo at start and end). Tests now upload real JPEG pictures.
+
+Frontend:
+- [x] The phone shrinks the photo to 2048 px (JPEG 92 %) before sending, so it uploads fast on mobile data; the server does the rest.
+- [x] Trip page "Check the meter": red line "The same photo is on trip T-005077. Check it." (or "The start and end photos are the same
+      picture. Check the km."), and the zoom shows the photo size (2048×1536 · 412 KB).
+- [x] App icon (navy, scan frame and road), icon for iPhone home screen, and "Add to home screen" on Android opens the driver page
+      as an app (`manifest.ts`, `public/icons/`).
+- [x] Wrong address (404): a road that ends at a barrier, a little car drives up and stops with hazard lights blinking; Start page / Driver
+      page buttons, language and theme. Errors: the same picture with a broken road, "Try again" and an error code for the office.
+- [x] Loading screens (grey shapes in the page layout) for the admin pages, the driver page, the car page and the passenger page.
+- [x] Driver pages: soft road drawing in the navy header; the sign-in page says "Ready for the road?". The card no longer slides under
+      the header.
+- [x] Car page when another driver has the car: chip "On a trip" (was "Available").
+- [x] Same words for a car everywhere: On trip / Available / Maintenance / Inactive (Bangla: যাত্রায় / খালি আছে / মেরামতে / বন্ধ).
+- [x] Cars and drivers: a trip still waiting for the passenger shows amber "Waiting for the passenger" (it said "On a trip").
+- [x] Hidden pages (Reports, Passengers, Audit log, Overtime) say "Coming in a later phase" without step numbers.
+- [x] Filter rows that scroll sideways on phones fade at the edge, so it is clear there is more.
+- [x] Passenger "Trip complete": small confetti burst around the green tick.
+- [x] Trip numbers no longer break over two lines in the open-trip boxes.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox: full tour of every page (welcome, both sign-ins, 404, dead code, driver home, car page in all states, start,
+      Start QR, driving, end form, End QR, complete; passenger start, started, end, done, thanks; every admin page and detail page) on
+      laptop 1440 px and phone 390 px, light and dark, plus Bangla. No sideways scrolling, no browser errors. The earlier end-to-end
+      checks (changes, step 7, step 8) pass again. Lint, types and build pass.
+- [ ] To verify on the laptop and phones: run `python -m alembic upgrade head` and `python -m app.recompress_photos --apply`; start a trip
+      with a real phone photo and open it on the trip page (upright, sharp digits, size shown); install the app icon on a phone; open a
+      wrong address.
+
+Phase 1 is complete with this step. Next: Docker and Azure (moving to the server), then the hidden pages and reading the km from the
+photo (OCR).
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -857,6 +909,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 - `alerts.note`, `alerts.resolved_at`; `admin_users.status`; `vehicles.reg_number` is unique.
 - `trips.is_visitor`, `visitor_name`, `visitor_phone`, `visitor_reason` (migration 0002, for passengers who are not EPIC employees).
 - `trips.passenger_key_hash` (the phone that confirmed the start), `trip_reviews` (passenger rating), `passengers.name` optional (migration 0005).
+- `trip_photos.width`, `height`, `size_bytes`, `original_bytes`, `sha256` (photo details and fingerprint, migration 0006).
 - `created_at` / `updated_at` columns on most tables.
 
 ### Assumptions to confirm
@@ -875,6 +928,7 @@ pip install fastapi "uvicorn[standard]" sqlalchemy alembic "psycopg[binary]" pyd
 copy .env.example .env        # first time only, then edit DATABASE_URL and SECRET_KEY
 python -m alembic upgrade head   # create/update tables
 python -m app.rename_ids         # only for a database made before 2026-10-11: shows the new IDs; add --apply to rename
+python -m app.recompress_photos  # only for photos saved before step 9: shows what would change; add --apply to do it
 python -m app.seed               # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
 python -m pytest -q              # all backend tests
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000   # API at http://127.0.0.1:8000, docs at /api/docs
@@ -890,7 +944,7 @@ All commands go through `python -m ...`. On the company laptop, Windows Applicat
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`), `ENVIRONMENT` (`development` or `production`;
 production refuses to start with a weak key). Optional: `DRIVER_TOKEN_DAYS` (30), `ADMIN_TOKEN_MINUTES` (480),
 `LOGIN_MAX_FAILURES` (5), `LOGIN_LOCKOUT_MINUTES` (15), `CORS_ORIGINS`, `PUBLIC_BASE_URL` (QR links, default
-`http://localhost:3000`), `STORAGE_DIR` (photos, default `uploads`), `MAX_PHOTO_MB` (5), `PDF_FONT_PATH` / `PDF_FONT_BOLD_PATH` (a font file with Bangla letters for PDF reports).
+`http://localhost:3000`), `STORAGE_DIR` (photos, default `uploads`), `MAX_PHOTO_MB` (12), `PDF_FONT_PATH` / `PDF_FONT_BOLD_PATH` (a font file with Bangla letters for PDF reports).
 
 Change an admin password: `python -m app.set_password admin` (hidden prompt, 8-72 characters).
 Create a user: `python -m app.set_password mary --create --role viewer`.
@@ -970,7 +1024,7 @@ npm run start:lan             # run the production build for phones (faster than
 | POST | `/api/admin/alerts/{id}/solve` | admin | mark an alert as solved, with a note |
 | GET | `/api/admin/dashboard` | admin / viewer | cards, car board, live trips, alerts, charts |
 | GET | `/api/admin/trips` | admin / viewer | trip history with filters and search |
-| GET | `/api/admin/trips/{id}` | admin / viewer | trip detail: people, map points, photo links, timeline, alerts |
+| GET | `/api/admin/trips/{id}` | admin / viewer | trip detail: people, map points, photo links with size and "same photo on trip ...", timeline, alerts |
 | GET | `/api/admin/photos/{trip_id}/{kind}` | signed link | dashboard photo, link valid 10 minutes |
 | GET | `/api/admin/audit` | admin | audit log search |
 | GET | `/api/admin/cars` | admin / viewer | car list with totals and open trip; filters `q`, `status` |
@@ -1024,7 +1078,7 @@ README.md                  this file
 docs/                      the project plan PDF
 backend/
   alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text,
-                           0005_typed_passengers_reviews)
+                           0005_typed_passengers_reviews, 0006_photo_details)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -1046,6 +1100,7 @@ backend/
   app/services/reports.py  the seven reports; app/services/report_export.py Excel and PDF files
   app/services/people_import.py reads the passenger Excel sheet
   app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
+  app/services/photos.py   cleans every dashboard photo (upright, 2048 px, JPEG 88, no hidden data, fingerprint)
   app/services/timeutil.py Bangladesh days for dashboards and filters
   app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
                            phone normalizing (phones.py)
@@ -1054,6 +1109,7 @@ backend/
   app/services/activity.py km per day and ratings for the car and driver pages
   app/seed.py              development seed data
   app/rename_ids.py        one-off: new driver IDs (DR9001 ...) and passenger IDs without the dash, keeping all trips
+  app/recompress_photos.py one-off: older photos to the same standard as new ones
   app/set_password.py      command to change/create admin passwords
   tests/test_db_rules.py   checks that the DB enforces the business rules
   tests/test_auth.py       sign-in, lockout and role-guard tests
@@ -1071,6 +1127,7 @@ backend/
   tests/test_alerts.py     background alerts, reminders, alerts list
   tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
+  tests/test_photos.py     photo cleaning and the same photo used twice
 frontend/                  Next.js app
   messages/en.json, bn.json  all texts, English and Bangla
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
@@ -1102,16 +1159,23 @@ frontend/                  Next.js app
   src/lib/passenger-api.ts types and calls for the passenger pages
   src/lib/api.ts           browser calls to the API (errors, X-S2D header); server-api.ts for server-side checks
   public/brand/            Epic Group logo (cream and navy)
+  src/app/icon.svg, apple-icon.png, manifest.ts, public/icons/  app icon and "Add to home screen"
+  src/app/not-found.tsx, error.tsx, */loading.tsx  wrong address, error and loading screens
+  src/components/states/   the road pictures for those screens (lost-road.tsx) and the error view
   scripts/dev-lan.mjs      starts the dev server for phones (http or https with its own certificate) and prints the address + QR code
 ```
 
 ## Next steps
 
-1. Verify the unchecked items above (step 7 and step 8) on the laptop and phones, and commit.
-2. Step 9: polish, a full phone test over HTTPS, then Docker and Azure.
+Phase 1 (steps 1 to 9) is done.
+
+1. Verify the unchecked items above (steps 7, 8 and 9) on the laptop and phones, including a full phone test over HTTPS, and commit.
+2. Docker and Azure: containers for the backend, frontend and worker, Azure Blob Storage for photos, production settings
+   (forwarded IP headers, secure cookies, real certificate).
 3. Later, when wanted: Reports, Passengers, Audit log and Driver overtime pages (hidden in the menus now).
-4. Backend still open: Azure Blob Storage for photos, production hardening (with the Docker / Azure step), a Bangla font for PDF reports.
-5. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
+4. Reading the km from the dashboard photo (OCR): every photo is already stored the same way for it (`app/services/photos.py`).
+5. Backend still open: a Bangla font for PDF reports.
+6. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
 
 ## Conventions for whoever continues
 

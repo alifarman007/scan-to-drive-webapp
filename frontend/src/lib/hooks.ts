@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const noop = () => () => {};
 
@@ -95,4 +95,36 @@ export function useWakeLock(active: boolean) {
       void lock?.release();
     };
   }, [active]);
+}
+
+/**
+ * For a row that scrolls sideways on phones (filter chips): fades the edge that has more to see, so people
+ * know they can swipe. Returns [ref for the scrolling element, style (a CSS mask) to put on it].
+ */
+export function useScrollFade<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      const left = el.scrollLeft > 2;
+      const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+      setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
+    };
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", check);
+      ro.disconnect();
+    };
+  }, []);
+  const mask =
+    edges.left || edges.right
+      ? `linear-gradient(to right, ${edges.left ? "transparent 0, #000 28px" : "#000 0"}, ${edges.right ? "#000 calc(100% - 28px), transparent 100%" : "#000 100%"})`
+      : undefined;
+  const style: React.CSSProperties | undefined = mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined;
+  return [ref, style] as const;
 }

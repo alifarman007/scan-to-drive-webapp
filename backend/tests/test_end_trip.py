@@ -12,9 +12,9 @@ from app.main import app
 from app.models import Alert, Passenger, Setting, Trip, TripEvent, TripPhoto, TripToken
 from app.services.phones import normalize_phone
 from app.storage import LocalStorage, get_storage
-from tests.test_trips import JPEG, auth, make_car, make_driver, start
+from tests.test_trips import JPEG, auth, make_car, make_driver, real_jpeg, start, stored
 
-END_JPEG = b"\xff\xd8\xff" + b"1" * 3000
+END_JPEG = real_jpeg((90, 60, 40))
 
 
 def _uid() -> str:
@@ -117,7 +117,7 @@ def test_driver_ends_the_trip_and_gets_an_end_qr(client, db):
 
     # end photo saved next to the start photo
     photo = db.scalar(select(TripPhoto).where(TripPhoto.trip_id == trip_id, TripPhoto.kind == "end"))
-    assert (client.storage_dir / photo.file_url).read_bytes() == END_JPEG
+    assert (client.storage_dir / photo.file_url).read_bytes() == stored(END_JPEG)
 
     # car stays busy and its km does NOT move until the passenger confirms (PDF S7)
     db.refresh(car)
@@ -222,8 +222,8 @@ def test_passenger_sees_the_trip_summary(client, db):
     assert (t["start_km"], t["end_km"], t["distance_km"]) == (45000, 45038, 38)
     assert t["journey_minutes"] is not None and t["end_place"] == "Factory, Gazipur"
     assert "phone" not in str(body).lower() and p.name not in str(body)  # no personal data
-    assert client.get(f"/api/p/{raw}/photo/start").content == JPEG
-    assert client.get(f"/api/p/{raw}/photo/end").content == END_JPEG
+    assert client.get(f"/api/p/{raw}/photo/start").content == stored(JPEG)
+    assert client.get(f"/api/p/{raw}/photo/end").content == stored(END_JPEG)
 
 
 def test_visitor_trip_asks_for_the_phone_number(client, db):

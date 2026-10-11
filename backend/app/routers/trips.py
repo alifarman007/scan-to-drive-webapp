@@ -22,6 +22,7 @@ from app.services.jobs import driver_reminders
 from app.services.qr_access import is_locked
 from app.services.tokens import create_trip_token, revoke_open_tokens
 from app.services.trips import open_trip_for_driver, start_blocker
+from app.services.photos import BadPhoto, PreparedPhoto, prepare_photo
 from app.storage import PhotoStorage, detect_image_type, get_storage
 
 router = APIRouter(prefix="/trips", tags=["trips"])
@@ -29,15 +30,23 @@ router = APIRouter(prefix="/trips", tags=["trips"])
 MAX_KM = 9_999_999
 
 
-def _read_photo(photo: UploadFile) -> tuple[bytes, str]:
+def _read_photo(photo: UploadFile) -> PreparedPhoto:
+    """Read the upload, check it is a real picture, and clean / compress it (app/services/photos.py)."""
     limit = settings.max_photo_mb * 1024 * 1024
     data = photo.file.read(limit + 1)
     if len(data) > limit:
         raise api_error(413, "PHOTO_TOO_LARGE", f"Photo is larger than {settings.max_photo_mb} MB")
-    ext = detect_image_type(data)
-    if ext is None:
+    if detect_image_type(data) is None:
         raise api_error(400, "INVALID_PHOTO", "The dashboard photo must be a JPEG, PNG or WebP picture")
-    return data, ext
+    try:
+        return prepare_photo(data)
+    except BadPhoto:
+        raise api_error(400, "INVALID_PHOTO", "The dashboard photo could not be read. Please take it again.")
+
+
+def _photo_row(trip_id: int, kind: TripStage, key: str, p: PreparedPhoto) -> TripPhoto:
+    return TripPhoto(trip_id=trip_id, kind=kind, file_url=key, width=p.width, height=p.height,
+                     size_bytes=len(p.data), original_bytes=p.original_bytes, sha256=p.sha256)
 
 
 @router.post("", status_code=201)
@@ -65,7 +74,7 @@ def start_trip(
     if not with_passenger and purpose is None:
         raise api_error(422, "PURPOSE_REQUIRED", "Purpose is required for trips without a passenger")
 
-    data, ext = _read_photo(photo)  # fail fast before touching the database
+    pic = _read_photo(photo)  # fail fast before touching the database
 
     # Lock the car row so two drivers cannot start on it at the same moment.
     vehicle = db.scalar(select(Vehicle).where(Vehicle.car_code == car_code).with_for_update())
@@ -100,9 +109,9 @@ def start_trip(
         db.flush()
         db.refresh(trip)  # picks up the generated trip number
 
-        photo_key = f"trips/{trip.id}/start.{ext}"
-        storage.save(photo_key, data)
-        db.add(TripPhoto(trip_id=trip.id, kind=TripStage.start, file_url=photo_key))
+        photo_key = f"trips/{trip.id}/start.{pic.ext}"
+        storage.save(photo_key, pic.data)
+        db.add(_photo_row(trip.id, TripStage.start, photo_key, pic))
 
         qr = None
         if with_passenger:
@@ -269,7 +278,7 @@ def end_trip(
     end_place = end_place.strip()
     if not end_place:
         raise api_error(422, "FIELD_REQUIRED", "End place is required")
-    data, ext = _read_photo(photo)  # fail fast before touching the database
+    pic = _read_photo(photo)  # fail fast before touching the database
 
     trip = _own_trip_in_state(db, trip_id, driver, TripStatus.in_progress, lock=True)
     if end_km <= trip.start_km:
@@ -286,9 +295,9 @@ def end_trip(
     photo_key = None
     qr = None
     try:
-        photo_key = f"trips/{trip.id}/end.{ext}"
-        storage.save(photo_key, data)
-        db.add(TripPhoto(trip_id=trip.id, kind=TripStage.end, file_url=photo_key))
+        photo_key = f"trips/{trip.id}/end.{pic.ext}"
+        storage.save(photo_key, pic.data)
+        db.add(_photo_row(trip.id, TripStage.end, photo_key, pic))
 
         if trip.with_passenger:
             trip.status = TripStatus.waiting_for_end_confirm

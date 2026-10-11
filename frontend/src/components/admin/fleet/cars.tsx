@@ -235,7 +235,7 @@ function CarCard({ car }: { car: Car }) {
         <div className="-mx-4 -mb-4 -ml-5 flex items-center gap-2 bg-trip-bg/70 px-5 py-2 text-xs font-semibold text-trip-fg">
           {car.open_trip.status === "in_progress" ? <LiveDot className="bg-trip-dot" /> : <span className="size-2 rounded-full bg-wait-dot" />}
           <span className="truncate">{car.open_trip.driver_name}</span>
-          <span className="ml-auto font-mono">{car.open_trip.trip_no}</span>
+          <span className="ml-auto shrink-0 font-mono whitespace-nowrap">{car.open_trip.trip_no}</span>
         </div>
       ) : null}
     </Link>
@@ -321,14 +321,17 @@ export function CarDetailView({ data, isNew }: { data: CarDetail; isNew: boolean
                 {car.open_trip ? (
                   <Link
                     href={`/admin/trips/${car.open_trip.id}`}
-                    className="flex items-center gap-3 rounded-2xl bg-trip-bg px-4 py-3 text-trip-fg transition-transform hover:-translate-y-0.5"
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl px-4 py-3 transition-transform hover:-translate-y-0.5",
+                      car.open_trip.status === "in_progress" ? "bg-trip-bg text-trip-fg" : "bg-wait-bg text-wait-fg",
+                    )}
                   >
-                    <LiveDot className="bg-trip-dot" />
+                    {car.open_trip.status === "in_progress" ? <LiveDot className="bg-trip-dot" /> : <span className="size-2 rounded-full bg-wait-dot" />}
                     <span className="flex flex-col">
-                      <span className="text-xs font-semibold">{t("onTripWith")}</span>
+                      <span className="text-xs font-semibold">{car.open_trip.status === "in_progress" ? t("onTripWith") : t("waitingWith")}</span>
                       <span className="font-bold">{car.open_trip.driver_name}</span>
                     </span>
-                    <span className="font-mono text-sm">{car.open_trip.trip_no}</span>
+                    <span className="font-mono text-sm whitespace-nowrap">{car.open_trip.trip_no}</span>
                   </Link>
                 ) : null}
               </div>

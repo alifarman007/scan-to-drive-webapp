@@ -8,7 +8,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 export function PassengerFrame({ children }: { children: React.ReactNode }) {
   const t = useTranslations("app");
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col overflow-x-clip">
       <header className="sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-gutter py-3">
           <Wordmark name={t("name")} tone="onLight" className="dark:hidden" />

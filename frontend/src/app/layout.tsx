@@ -23,6 +23,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: t("name"), template: `%s · ${t("name")}` },
     description: t("tagline"),
     robots: { index: false, follow: false },
+    applicationName: t("name"),
+    appleWebApp: { capable: true, title: t("name"), statusBarStyle: "black-translucent" },
   };
 }
 

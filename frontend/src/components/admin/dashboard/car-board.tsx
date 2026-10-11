@@ -9,7 +9,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { StatusChip } from "@/components/ui/status-chip";
 import type { BoardCar, BoardState } from "@/lib/admin-api";
-import { useNowSeconds } from "@/lib/hooks";
+import { useNowSeconds, useScrollFade } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 import { PanelTitle, secondsSince, useDuration } from "./bits";
@@ -29,6 +29,7 @@ export function CarBoard({ cars, asOf }: { cars: BoardCar[]; asOf: string }) {
   const t = useTranslations("dashboard");
   const ts = useTranslations("status");
   const [filter, setFilter] = useState<Filter>("all");
+  const [fadeRef, fadeStyle] = useScrollFade<HTMLDivElement>();
 
   const count = (s: BoardState) => cars.filter((c) => c.state === s).length;
   const filters: Filter[] = [
@@ -55,9 +56,11 @@ export function CarBoard({ cars, asOf }: { cars: BoardCar[]; asOf: string }) {
       />
       <LayoutGroup id="board-filter">
         <div
+          ref={fadeRef}
+          style={fadeStyle}
           role="tablist"
           aria-label={t("board.filter")}
-          className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+          className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none]"
         >
           {filters.map((f) => {
             const n =

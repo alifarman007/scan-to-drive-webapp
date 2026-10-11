@@ -23,7 +23,12 @@ export default async function DriverLoginPage({ searchParams }: Props) {
   const t = await getTranslations("driverAuth");
   return (
     <DriverFrame
-      header={<p className="text-xs font-bold tracking-[0.14em] text-sky uppercase">{t("eyebrow")}</p>}
+      header={
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-bold tracking-[0.14em] text-sky uppercase">{t("eyebrow")}</p>
+          <h1 className="font-display text-3xl leading-tight font-bold">{t("hero")}</h1>
+        </div>
+      }
     >
       <Reveal>
         <Card className="border-0 p-5 shadow-lift sm:p-6">

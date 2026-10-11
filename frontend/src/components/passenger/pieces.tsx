@@ -218,10 +218,45 @@ export function DeadCode({ code }: { code: string }) {
   );
 }
 
-/** Green tick that draws itself, with a soft ring pulsing out once. */
-export function SuccessMark() {
+const CONFETTI = Array.from({ length: 22 }, (_, i) => {
+  const angle = -Math.PI / 2 + ((i / 21) - 0.5) * Math.PI * 1.25; // a fan upwards
+  const speed = 96 + (i % 5) * 16; // stays inside a 320 px wide phone
+  return {
+    x: Math.cos(angle) * speed,
+    y: Math.sin(angle) * speed,
+    fall: 150 + (i % 4) * 30,
+    rotate: (i % 2 ? 1 : -1) * (180 + i * 25),
+    colour: ["#155dfc", "#2bb683", "#f5a524", "#9fb4f5", "#284dae", "#ff5c7a"][i % 6],
+    w: i % 3 === 0 ? 6 : 9,
+    h: i % 3 === 0 ? 6 : 4,
+    delay: 0.32 + (i % 5) * 0.025,
+  };
+});
+
+/** Green tick that draws itself, with a soft ring pulsing out once. `celebrate`: a little confetti too. */
+export function SuccessMark({ celebrate = false }: { celebrate?: boolean }) {
   return (
     <div className="relative mx-auto flex size-24 items-center justify-center">
+      {celebrate ? (
+        <span aria-hidden="true" className="pointer-events-none absolute top-1/2 left-1/2">
+          {CONFETTI.map((c, i) => (
+            <motion.span
+              key={i}
+              className="absolute rounded-[2px]"
+              style={{ width: c.w, height: c.h, background: c.colour, marginLeft: -c.w / 2, marginTop: -c.h / 2 }}
+              initial={{ x: 0, y: 0, opacity: 0, rotate: 0 }}
+              animate={{ x: [0, c.x, c.x * 1.1], y: [0, c.y, c.y + c.fall], opacity: [0, 1, 1, 0], rotate: c.rotate }}
+              transition={{
+                duration: 1.6,
+                delay: c.delay,
+                x: { duration: 1.6, delay: c.delay, times: [0, 0.4, 1], ease: ["easeOut", "linear"] },
+                y: { duration: 1.6, delay: c.delay, times: [0, 0.4, 1], ease: ["easeOut", "easeIn"] },
+                opacity: { duration: 1.6, delay: c.delay, times: [0, 0.08, 0.75, 1] },
+              }}
+            />
+          ))}
+        </span>
+      ) : null}
       <motion.span
         className="absolute inset-0 rounded-full bg-ok-dot/25"
         initial={{ scale: 0.6, opacity: 0.9 }}

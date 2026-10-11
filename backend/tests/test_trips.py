@@ -17,7 +17,22 @@ from app.security import create_access_token, hash_secret
 from app.services.tokens import hash_token
 from app.storage import LocalStorage, get_storage
 
-JPEG = b"\xff\xd8\xff" + b"0" * 2000
+def real_jpeg(colour=(40, 60, 90), size=(64, 48)) -> bytes:
+    """A small but real JPEG (the server opens and re-saves every photo)."""
+    import io
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", size, colour).save(buf, "JPEG", quality=95)
+    return buf.getvalue()
+
+
+def stored(photo: bytes) -> bytes:
+    """What the server keeps for this upload (cleaned and compressed)."""
+    from app.services.photos import prepare_photo
+    return prepare_photo(photo).data
+
+
+JPEG = real_jpeg()
 
 
 def _uid() -> str:
@@ -140,7 +155,7 @@ def test_start_trip_with_passenger(client, db, storage, tmp_path):
 
     # photo saved and recorded
     photo = db.scalar(select(TripPhoto).where(TripPhoto.trip_id == trip["id"]))
-    assert photo.kind.value == "start" and (tmp_path / photo.file_url).read_bytes() == JPEG
+    assert photo.kind.value == "start" and (tmp_path / photo.file_url).read_bytes() == stored(JPEG)
 
     # audit record with GPS, and the car is now held
     ev = db.scalar(select(TripEvent).where(TripEvent.trip_id == trip["id"], TripEvent.event == "trip_started"))

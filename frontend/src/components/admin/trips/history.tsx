@@ -23,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import type { HistoryTrip, TripPage } from "@/lib/admin-api";
 import { NO_FILTERS, PAGE_SIZE, STATUSES, hasFilters, pageHref, type Filters, type Range } from "@/lib/trip-filters";
+import { useScrollFade } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 import { useDuration } from "../dashboard/bits";
@@ -292,9 +293,16 @@ function SearchBox({ value, onSearch }: { value: string; onSearch: (q: string) =
 /** All time / Today / This week / This month / Pick dates; picking dates shows two date boxes. */
 function RangePicker({ filters, onChange }: { filters: Filters; onChange: (f: Partial<Filters>) => void }) {
   const t = useTranslations("trips.range");
+  const [fadeRef, fadeStyle] = useScrollFade<HTMLDivElement>();
   return (
     <div className="flex max-w-full min-w-0 flex-wrap items-center gap-2">
-      <div role="radiogroup" aria-label={t("label")} className="flex max-w-full gap-0.5 overflow-x-auto rounded-[0.8rem] bg-soft p-1 [scrollbar-width:none]">
+      <div
+        ref={fadeRef}
+        style={fadeStyle}
+        role="radiogroup"
+        aria-label={t("label")}
+        className="flex max-w-full gap-0.5 overflow-x-auto rounded-[0.8rem] bg-soft p-1 [scrollbar-width:none]"
+      >
         {RANGES.map((r) => {
           const active = filters.range === r;
           return (

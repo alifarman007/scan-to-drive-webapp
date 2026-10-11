@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { TripStatusChip } from "@/components/admin/trip-status";
 import { Card } from "@/components/ui/card";
 import type { DayActivity, HistoryTrip, RatingSummary } from "@/lib/admin-api";
+import { useScrollFade } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 /*
@@ -100,8 +101,15 @@ export function Segmented<T extends string>({
   label: string;
   className?: string;
 }) {
+  const [fadeRef, fadeStyle] = useScrollFade<HTMLDivElement>();
   return (
-    <div role="radiogroup" aria-label={label} className={cn("flex max-w-full overflow-x-auto rounded-control bg-soft p-1 [scrollbar-width:none]", className)}>
+    <div
+      ref={fadeRef}
+      style={fadeStyle}
+      role="radiogroup"
+      aria-label={label}
+      className={cn("flex max-w-full overflow-x-auto rounded-control bg-soft p-1 [scrollbar-width:none]", className)}
+    >
       {options.map((o) => {
         const on = o.value === value;
         return (

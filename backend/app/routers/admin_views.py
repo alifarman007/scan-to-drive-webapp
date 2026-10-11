@@ -278,8 +278,22 @@ def trip_detail(
         raise api_error(404, "TRIP_NOT_FOUND", "Trip not found")
     now = datetime.now(timezone.utc)
 
-    kinds = set(db.scalars(select(TripPhoto.kind).where(TripPhoto.trip_id == t.id)).all())
-    photos = {k.value: {"url": sign_photo_link(t.id, k.value) if k in kinds else None} for k in TripStage}
+    saved = {p.kind: p for p in db.scalars(select(TripPhoto).where(TripPhoto.trip_id == t.id))}
+    photos = {}
+    for k in TripStage:
+        p = saved.get(k)
+        photos[k.value] = {
+            "url": sign_photo_link(t.id, k.value) if p else None,
+            "width": p.width if p else None, "height": p.height if p else None,
+            "size_bytes": p.size_bytes if p else None, "original_bytes": p.original_bytes if p else None,
+            # the same picture already used on another trip (a copied photo instead of a new one)
+            "reused_on": None,
+        }
+        if p and p.sha256:
+            other = db.execute(select(Trip.id, Trip.trip_no).join(TripPhoto, TripPhoto.trip_id == Trip.id).where(
+                TripPhoto.sha256 == p.sha256, TripPhoto.id != p.id).order_by(Trip.id == t.id, Trip.id.desc()).limit(1)).first()
+            if other:
+                photos[k.value]["reused_on"] = {"id": other[0], "trip_no": other[1]}
 
     events = db.scalars(
         select(TripEvent).where(TripEvent.trip_id == t.id).order_by(TripEvent.created_at, TripEvent.id)

@@ -311,11 +311,18 @@ export function DriverDetailView({ data, isNew }: { data: DriverDetail; isNew: b
             <Reveal delay={0.08}>
               <Link
                 href={`/admin/trips/${driver.open_trip.id}`}
-                className="flex items-center gap-3 rounded-2xl bg-trip-bg px-4 py-3 text-trip-fg transition-transform hover:-translate-y-0.5"
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl px-4 py-3 transition-transform hover:-translate-y-0.5",
+                  driver.open_trip.status === "in_progress" ? "bg-trip-bg text-trip-fg" : "bg-wait-bg text-wait-fg",
+                )}
               >
-                <LiveDot className="bg-trip-dot" />
-                <span className="font-semibold">{t("onTripNow", { car: driver.open_trip.car_code })}</span>
-                <span className="ml-auto font-mono text-sm">{driver.open_trip.trip_no}</span>
+                {driver.open_trip.status === "in_progress" ? <LiveDot className="bg-trip-dot" /> : <span className="size-2 shrink-0 rounded-full bg-wait-dot" />}
+                <span className="min-w-0 font-semibold">
+                  {driver.open_trip.status === "in_progress"
+                    ? t("onTripNow", { car: driver.open_trip.car_code })
+                    : t("waitingNow", { car: driver.open_trip.car_code })}
+                </span>
+                <span className="ml-auto shrink-0 font-mono text-sm whitespace-nowrap">{driver.open_trip.trip_no}</span>
               </Link>
             </Reveal>
           ) : null}

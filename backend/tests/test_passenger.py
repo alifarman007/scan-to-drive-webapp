@@ -14,7 +14,7 @@ from app.models import (
 )
 from app.security import hash_secret
 from app.storage import LocalStorage, get_storage
-from tests.test_trips import JPEG, auth, make_car, make_driver, start
+from tests.test_trips import JPEG, auth, make_car, make_driver, start, stored
 
 
 def _uid() -> str:
@@ -88,7 +88,7 @@ def test_open_start_qr_shows_trip_details(client, db):
 def test_start_photo_is_served_while_qr_is_valid(client, db):
     _, _, _, raw = new_trip(client, db)
     r = client.get(f"/api/p/{raw}/photo")
-    assert r.status_code == 200 and r.content == JPEG
+    assert r.status_code == 200 and r.content == stored(JPEG)
     assert r.headers["content-type"] == "image/jpeg" and r.headers["cache-control"] == "no-store"
     assert client.get("/api/p/not-a-real-token/photo").status_code == 404
 

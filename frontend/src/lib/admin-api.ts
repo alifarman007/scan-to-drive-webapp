@@ -210,6 +210,16 @@ export type TimelineEvent = {
   detail: Record<string, unknown> | null;
 };
 
+/** A dashboard photo: signed link (10 minutes) and what the server stored. `reused_on`: the same picture is on another trip. */
+export type TripPhotoInfo = {
+  url: string | null;
+  width?: number | null;
+  height?: number | null;
+  size_bytes?: number | null;
+  original_bytes?: number | null;
+  reused_on?: { id: number; trip_no: string } | null;
+};
+
 export type TripDetail = {
   trip: HistoryTrip & {
     driver: { id: number; employee_id: string; name: string; phone: string | null };
@@ -217,7 +227,7 @@ export type TripDetail = {
     visitor: { name: string; phone: string; reason: string | null } | null;
     vehicle: { id: number; car_code: string; model: string; reg_number: string };
     map_points: { start: { lat: number; lng: number } | null; end: { lat: number; lng: number } | null };
-    photos: { start: { url: string | null }; end: { url: string | null } };
+    photos: { start: TripPhotoInfo; end: TripPhotoInfo };
     approved_by_name: string | null;
     lock: { stage: "start" | "end"; locked: boolean; tries_left: number } | null;
     review: Review | null;

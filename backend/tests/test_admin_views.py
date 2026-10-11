@@ -12,7 +12,7 @@ from tests.test_cant_scan import cant_scan, waiting_trip
 from tests.test_end_trip import (  # noqa: F401  (client fixture comes from there)
     END_JPEG, client, confirm_end, end, make_passenger, running_trip, token_of,
 )
-from tests.test_trips import JPEG, auth, make_car, make_driver, start
+from tests.test_trips import JPEG, auth, make_car, make_driver, start, stored
 
 
 def get(client, admin, path, **params):
@@ -230,7 +230,9 @@ def test_trip_detail_with_timeline_and_photos(client, db):
     for kind, data in (("start", JPEG), ("end", END_JPEG)):
         url = trip["photos"][kind]["url"]
         r = client.get(url)  # no sign-in header: it is for an <img> tag
-        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg" and r.content == data
+        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg" and r.content == stored(data)
+        info = trip["photos"][kind]
+        assert info["width"] == 64 and info["height"] == 48 and info["size_bytes"] == len(stored(data))
 
 
 def test_detail_shows_visitor_and_missing_end_photo(client, db):

@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props) {
   return { title: t(section as NavKey) };
 }
 
-/** Stand-in for admin pages that are not built yet; says which build step brings them. */
+/** Stand-in for admin pages that come in a later phase (hidden from the menus; see HIDDEN_NAV in nav.ts). */
 export default async function SectionPlaceholder({ params }: Props) {
   const { section } = await params;
   const step = stepOf(section);
@@ -35,7 +35,7 @@ export default async function SectionPlaceholder({ params }: Props) {
           </span>
           <div className="flex flex-col gap-1">
             <p className="font-display text-lg font-semibold text-title">{t("placeholder.title")}</p>
-            <p className="text-muted">{t("placeholder.body", { step })}</p>
+            <p className="text-muted">{t("placeholder.body")}</p>
           </div>
         </Card>
       </Reveal>

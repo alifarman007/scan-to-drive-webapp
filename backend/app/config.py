@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:3000"
     # Where dashboard photos are saved in development (Azure Blob Storage comes later).
     storage_dir: str = "uploads"
-    max_photo_mb: int = 5
+    max_photo_mb: int = 12  # the server compresses every photo (app/services/photos.py); this only limits the upload
 
     # Optional TrueType fonts for PDF reports. The built-in PDF font has no Bangla letters; point these to a
     # font that has them (for example Noto Sans Bengali) if names or places in Bangla must appear in PDFs.

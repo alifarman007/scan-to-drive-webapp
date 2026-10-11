@@ -279,7 +279,7 @@ function Panel({ children }: { children: React.ReactNode }) {
 function Heading({ title, lead }: { title: string; lead: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <h1 className="font-display text-2xl font-bold text-title">{title}</h1>
+      <h2 className="font-display text-2xl font-bold text-title">{title}</h2>
       <p className="text-sm text-muted">{lead}</p>
     </div>
   );

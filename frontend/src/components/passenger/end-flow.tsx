@@ -381,7 +381,7 @@ function EndDone({ result }: { result: EndConfirmed }) {
   const { trip } = result;
   return (
     <div className="flex flex-col gap-5 pt-4 text-center">
-      <SuccessMark />
+      <SuccessMark celebrate />
       <Reveal delay={0.2} className="flex flex-col items-center gap-2">
         <h1 className="font-display text-3xl font-bold text-title">{t("endDoneTitle")}</h1>
         <p className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-semibold text-muted">

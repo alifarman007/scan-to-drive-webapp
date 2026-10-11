@@ -1,15 +1,16 @@
 "use client";
 
-import { ArrowRightIcon, CameraSlashIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, MapPinIcon, XIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, CameraSlashIcon, CopyIcon, MagnifyingGlassMinusIcon, MagnifyingGlassPlusIcon, MapPinIcon, XIcon } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { useRef, useState } from "react";
 
 import { Card } from "@/components/ui/card";
 import { Odometer } from "@/components/ui/odometer";
-import type { TripDetail } from "@/lib/admin-api";
+import type { TripDetail, TripPhotoInfo } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 
 type Trip = TripDetail["trip"];
@@ -38,6 +39,8 @@ export function MeterCheck({ trip }: { trip: Trip }) {
         <Side
           stage="start"
           photo={trip.photos.start.url}
+          info={trip.photos.start}
+          tripId={trip.id}
           km={trip.start_km}
           place={trip.start_place}
           time={trip.start_time}
@@ -61,6 +64,8 @@ export function MeterCheck({ trip }: { trip: Trip }) {
         <Side
           stage="end"
           photo={trip.photos.end.url}
+          info={trip.photos.end}
+          tripId={trip.id}
           km={trip.end_km}
           place={trip.end_place}
           time={trip.end_time}
@@ -76,6 +81,8 @@ export function MeterCheck({ trip }: { trip: Trip }) {
 function Side({
   stage,
   photo,
+  info,
+  tripId,
   km,
   place,
   time,
@@ -85,6 +92,8 @@ function Side({
 }: {
   stage: "start" | "end";
   photo: string | null;
+  info: TripPhotoInfo;
+  tripId: number;
   km: number | null;
   place: string | null;
   time: string | null;
@@ -99,13 +108,22 @@ function Side({
     <div className="flex min-w-0 flex-col gap-3">
       <span className="text-sm font-bold text-title">{stage === "start" ? t("start") : t("end")}</span>
       {photo ? (
-        <PhotoZoom src={photo} alt={stage === "start" ? t("startAlt") : t("endAlt")} km={km} />
+        <PhotoZoom src={photo} alt={stage === "start" ? t("startAlt") : t("endAlt")} km={km} info={info} />
       ) : (
         <div className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border-[1.5px] border-dashed border-border-strong bg-bay text-center text-sm text-muted">
           <CameraSlashIcon size={28} weight="duotone" />
           {km !== null ? t("noPhoto") : stopped ? t("neverEnded") : t("notEnded")}
         </div>
       )}
+      {info.reused_on ? (
+        <Link
+          href={`/admin/trips/${info.reused_on.id}`}
+          className="flex items-start gap-2 rounded-xl bg-bad-bg px-3 py-2 text-xs font-semibold text-bad-fg hover:underline"
+        >
+          <CopyIcon size={15} weight="bold" className="mt-px shrink-0" />
+          {info.reused_on.id === tripId ? t("reusedSameTrip") : t("reused", { trip: info.reused_on.trip_no })}
+        </Link>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-semibold text-muted">{t("typed")}</span>
@@ -133,7 +151,7 @@ function Side({
  * part follows the mouse, so the odometer digits can be read. The typed km stays in the corner to compare.
  * Photo links expire after 10 minutes: a failed load fetches the page again for fresh links.
  */
-function PhotoZoom({ src, alt, km }: { src: string; alt: string; km: number | null }) {
+function PhotoZoom({ src, alt, km, info }: { src: string; alt: string; km: number | null; info: TripPhotoInfo }) {
   const t = useTranslations("tripDetail.meter");
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -239,7 +257,14 @@ function PhotoZoom({ src, alt, km }: { src: string; alt: string; km: number | nu
                     draggable={false}
                   />
                 </div>
-                <p className="px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-[#9aa6c6]">{zoom ? t("zoomedHint") : t("zoomHint")}</p>
+                <p className="px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-center text-xs text-[#9aa6c6]">
+                  {zoom ? t("zoomedHint") : t("zoomHint")}
+                  {info.width && info.height && info.size_bytes ? (
+                    <span className="ml-2 font-mono opacity-80">
+                      · {info.width}×{info.height} · {Math.round(info.size_bytes / 1000)} KB
+                    </span>
+                  ) : null}
+                </p>
               </motion.div>
             </Dialog.Content>
           </Dialog.Portal>

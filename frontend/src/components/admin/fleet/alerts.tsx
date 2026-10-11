@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
 import { Select } from "@/components/ui/select";
-import { useNowSeconds } from "@/lib/hooks";
+import { useNowSeconds, useScrollFade } from "@/lib/hooks";
 import type { Alert, AlertPage, AlertType } from "@/lib/admin-api";
 import { ALERT_TYPES, ALERTS_PER_PAGE, type AlertFilters } from "@/lib/alert-filters";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,7 @@ export function AlertsView({ data, filters, cars }: { data: AlertPage; filters: 
   const [q, setQ] = useState(filters.q);
   const [gone, setGone] = useState<number[]>([]);
   const [flash, showFlash] = useFlash();
+  const [chipsFadeRef, chipsFadeStyle] = useScrollFade<HTMLDivElement>();
 
   const go = (next: Partial<AlertFilters>) => {
     const f = { ...filters, n: 1, ...next };
@@ -113,7 +114,7 @@ export function AlertsView({ data, filters, cars }: { data: AlertPage; filters: 
             ))}
           </Select>
         </div>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" role="group" aria-label={t("typeLabel")}>
+        <div ref={chipsFadeRef} style={chipsFadeStyle} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" role="group" aria-label={t("typeLabel")}>
           {ALERT_TYPES.map((type) => {
             const Icon = ALERT_ICON[type] ?? GaugeIcon;
             const on = filters.type === type;

@@ -43,8 +43,8 @@
     "passengerBody": "The driver shows a QR code on their phone. Scan it with your camera. No sign-in, no app."
   },
   "placeholder": {
-    "title": "This screen is being built",
-    "body": "It arrives in step {step} of the frontend build."
+    "title": "Coming in a later phase",
+    "body": "This page is planned for after Phase 1. Its data is already being collected."
   },
   "nav": {
     "main": "Main menu",
@@ -202,7 +202,8 @@
     "errMismatch": "The two PINs are different. Try again.",
     "errAlreadySet": "Your PIN is already set. Sign in with it, or ask the transport office to reset it.",
     "errNetwork": "No connection. Check the Wi-Fi and try again.",
-    "errServer": "Something went wrong. Please try again."
+    "errServer": "Something went wrong. Please try again.",
+    "hero": "Ready for the road?"
   },
   "driverHome": {
     "morning": "Good morning",
@@ -234,7 +235,8 @@
     "carStatus": {
       "active": "Available",
       "maintenance": "In maintenance",
-      "inactive": "Not in use"
+      "inactive": "Not in use",
+      "in_use": "On a trip"
     },
     "notFoundTitle": "Car {code} not found",
     "notFoundBody": "Check the car code. If the sticker is wrong, tell the transport office.",
@@ -745,7 +747,9 @@
       "closePhoto": "Close photo",
       "zoomHint": "Click the photo to zoom in where you point.",
       "zoomedHint": "Move the mouse to look around. Click again to zoom out.",
-      "neverEnded": "The driver never ended this trip"
+      "neverEnded": "The driver never ended this trip",
+      "reused": "The same photo is on trip {trip}. Check it.",
+      "reusedSameTrip": "The start and end photos are the same picture. Check the km."
     },
     "people": {
       "title": "People",
@@ -905,17 +909,17 @@
     "filterLabel": "Show",
     "filter": {
       "all": "All",
-      "on_trip": "On a trip",
-      "available": "Free",
-      "maintenance": "Workshop",
-      "inactive": "Off the fleet"
+      "on_trip": "On trip",
+      "available": "Available",
+      "maintenance": "Maintenance",
+      "inactive": "Inactive"
     },
     "state": {
-      "on_trip": "On a trip",
+      "on_trip": "On trip",
       "waiting": "Waiting",
-      "available": "Free",
-      "maintenance": "Workshop",
-      "inactive": "Off the fleet"
+      "available": "Available",
+      "maintenance": "Maintenance",
+      "inactive": "Inactive"
     },
     "alerts": "{count, plural, one {# alert} other {# alerts}}",
     "tripsShort": "trips",
@@ -944,19 +948,19 @@
     "stickerRenewed": "New sticker v{v} is ready to print",
     "statusSaved": {
       "active": "Car is back in use",
-      "maintenance": "Car is in the workshop",
-      "inactive": "Car taken off the fleet"
+      "maintenance": "Car is in maintenance",
+      "inactive": "Car is inactive"
     },
     "statusTitle": "Car status",
     "statusHint": {
       "active": "In use: drivers can start trips with it.",
-      "maintenance": "In the workshop: the sticker says the car cannot be used now.",
-      "inactive": "Off the fleet: kept with all its trips, but no new trips."
+      "maintenance": "In maintenance: scanning the sticker says the car cannot be used now.",
+      "inactive": "Inactive: kept with all its trips, but no new trips."
     },
     "status": {
       "active": "In use",
-      "maintenance": "Workshop",
-      "inactive": "Off"
+      "maintenance": "Maintenance",
+      "inactive": "Inactive"
     },
     "sticker": {
       "title": "QR sticker",
@@ -1014,7 +1018,8 @@
       "check": "Please check what you typed.",
       "network": "No connection. Try again.",
       "generic": "Something went wrong. Try again."
-    }
+    },
+    "waitingWith": "Waiting for the passenger, driver"
   },
   "drivers": {
     "title": "Drivers",
@@ -1109,7 +1114,8 @@
       "check": "Please check what you typed.",
       "network": "No connection. Try again.",
       "generic": "Something went wrong. Try again."
-    }
+    },
+    "waitingNow": "Waiting for the passenger in {car}"
   },
   "alertsPage": {
     "title": "Alerts",
@@ -1316,5 +1322,15 @@
       "off": "off"
     },
     "saveShort": "Save"
+  },
+  "states": {
+    "notFoundTitle": "This road doesn't go anywhere",
+    "notFoundBody": "The page you opened does not exist, or the link is old. Car stickers and passenger codes always start a fresh page.",
+    "home": "Start page",
+    "driverHome": "Driver page",
+    "errorTitle": "Something went wrong",
+    "errorBody": "This page hit a bump. Try again; if it keeps happening, tell the transport office.",
+    "tryAgain": "Try again",
+    "code": "Code: {digest}"
   }
 }

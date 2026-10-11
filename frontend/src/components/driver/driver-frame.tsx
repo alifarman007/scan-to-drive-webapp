@@ -1,6 +1,7 @@
 import { useTranslations } from "next-intl";
 
 import { Wordmark } from "@/components/brand";
+import { Road } from "@/components/road";
 import { LanguageSwitch } from "@/components/ui/language-switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -21,14 +22,16 @@ export function DriverFrame({
   const t = useTranslations("app");
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="rounded-b-[2rem] bg-navy px-gutter pt-[max(1.1rem,env(safe-area-inset-top))] pb-16 text-white">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
+      <header className="relative overflow-hidden rounded-b-[2rem] bg-navy px-gutter pt-[max(1.1rem,env(safe-area-inset-top))] pb-16 text-white">
+        <Road className="pointer-events-none absolute inset-0 h-full w-full opacity-35" />
+        <div className="relative mx-auto flex w-full max-w-md items-center justify-between gap-3">
           <Wordmark name={t("name")} />
           <LanguageSwitch tone="onDark" />
         </div>
-        {header ? <div className="mx-auto mt-7 w-full max-w-md">{header}</div> : null}
+        {header ? <div className="relative mx-auto mt-7 w-full max-w-md">{header}</div> : null}
       </header>
-      <main className="mx-auto -mt-10 flex w-full max-w-md flex-1 flex-col gap-4 px-gutter pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+      {/* relative: painted after the (positioned) header, so the pulled-up card sits on top of it */}
+      <main className="relative mx-auto -mt-10 flex w-full max-w-md flex-1 flex-col gap-4 px-gutter pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {children}
         {hideFooter ? null : (
           <div className="mt-auto flex items-center justify-between gap-3 pt-4">

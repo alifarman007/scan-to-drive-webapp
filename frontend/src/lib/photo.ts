@@ -1,8 +1,10 @@
 /**
- * Make a dashboard photo small enough to upload quickly on mobile data: longest side 1600 px, JPEG.
- * A 4-8 MB phone photo becomes about 250-500 KB, still sharp enough to read the odometer.
+ * Make a dashboard photo quick to upload on mobile data without losing the odometer digits: longest side
+ * 2048 px, JPEG 92 %. A 4-8 MB phone photo becomes about 0.4-0.9 MB. The server then cleans it the same way
+ * for every phone (upright, no hidden data, same size and quality: backend app/services/photos.py), so the km
+ * can later be read from the photo automatically.
  */
-export async function compressPhoto(file: File, maxSide = 1600, quality = 0.82): Promise<Blob> {
+export async function compressPhoto(file: File, maxSide = 2048, quality = 0.92): Promise<Blob> {
   const bitmap = await loadBitmap(file);
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * scale);
