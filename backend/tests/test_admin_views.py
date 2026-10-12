@@ -260,7 +260,7 @@ def test_detail_names_who_did_each_step_and_shows_the_lock(client, db):
     raw = token_of(end(client, driver, t).json()["end_qr"])
     assert get(client, admin, f"/trips/{t}").json()["trip"]["lock"] == {"stage": "end", "locked": False, "tries_left": 5}
     for _ in range(5):  # another phone, another person's ID
-        confirm_end(client, raw, employee_id="XYZ0000")
+        confirm_end(client, raw, employee_id="1230000")
     detail = get(client, admin, f"/trips/{t}").json()
     assert detail["trip"]["lock"] == {"stage": "end", "locked": True, "tries_left": 0}
     who = {e["event"]: e["who"] for e in detail["timeline"]}
@@ -275,6 +275,16 @@ def test_detail_names_who_did_each_step_and_shows_the_lock(client, db):
     who = {e["event"]: e["who"] for e in detail["timeline"]}
     assert who["trip_unlocked"] == {"kind": "admin", "ref": admin.username, "name": admin.username}
     assert detail["trip"]["lock"] is None  # completed: nothing to unlock
+
+
+def test_timeline_still_names_a_driver_whose_id_was_changed_twice(client, db):
+    admin = make_admin(db)
+    driver, _, _, t = running_trip(client, db)
+    for new in ("2468001", "2468002"):
+        r = client.patch(f"/api/admin/drivers/{driver.id}", json={"employee_id": new}, headers=hdr(admin))
+        assert r.status_code == 200, r.text
+    who = {e["event"]: e["who"] for e in get(client, admin, f"/trips/{t}").json()["timeline"]}
+    assert who["trip_started"]["name"] == driver.name
 
 
 def test_detail_says_who_approved(client, db):

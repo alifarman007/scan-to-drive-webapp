@@ -153,6 +153,7 @@ export function DriverLogin({ next }: { next: string }) {
                   autoFocus
                   autoCapitalize="characters"
                   autoComplete="username"
+                  inputMode="numeric"
                   spellCheck={false}
                   placeholder={t("employeeIdPlaceholder")}
                   value={employeeId}

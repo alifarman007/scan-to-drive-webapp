@@ -1,8 +1,9 @@
-"""Seed development data. Safe to run more than once (existing rows are kept).
+"""Fill a new, empty database: settings, the admin and viewer accounts, and the real fleet (app/fleet_data.py:
+vendor Lanka Bangla Enterprise, 24 cars, 24 drivers). Safe to run more than once (existing rows are kept; cars
+and drivers are only added to an empty database).
 
 Run from the backend folder:   python -m app.seed
-The data is SAMPLE data (names and numbers come from the PDF sketches).
-Do not run this against the live database.
+A database that still has the old test data: use python -m app.load_fleet instead.
 """
 import os
 import secrets
@@ -12,7 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.db import SessionLocal
-from app.models import AdminUser, Driver, Passenger, Setting, Vehicle
+from app.fleet_data import VENDOR_NAME, fleet
+from app.models import AdminUser, Driver, Setting, Vehicle, VehicleOwner, Vendor
 
 # Defaults for the admin-changeable settings (PDF section 11.2 "Settings").
 SETTINGS = [
@@ -25,26 +27,6 @@ SETTINGS = [
     ("allow_cant_scan", "1", "1 = driver may tap 'Passenger can't scan' and the admin approves later; 0 = off"),
     ("allow_visitors", "1", "1 = passenger page offers 'Other' (visitor) besides EPIC employee; 0 = employee ID only"),
 ]
-
-CAR_MODELS = ["Toyota Axio", "Toyota Allion", "Toyota Noah", "Toyota Premio", "Honda Grace"]
-START_KM = [41880, 22415, 45230, 30902, 18377, 9640, 12000, 27500, 33100, 15800]
-
-DRIVERS = [
-    ("DR9001", "Rahim Uddin"),
-    ("DR9002", "Karim Hossain"),
-    ("DR9003", "Sohel Rana"),
-    ("DR9004", "Jamal Sheikh"),
-]
-
-PASSENGERS = [
-    ("EMP2210", "Nadia Islam", "HR"),
-    ("EMP2211", "Faruk Ahmed", "Merchandising"),
-    ("EMP2212", "Tania Akter", "Accounts"),
-    ("EMP2213", "Imran Khan", "Production"),
-    ("EMP2214", "Shirin Sultana", "Compliance"),
-    ("EMP2215", "Mahbub Alam", "Commercial"),
-]
-
 
 def hash_password(raw: str) -> str:
     return bcrypt.hashpw(raw.encode(), bcrypt.gensalt()).decode()
@@ -61,38 +43,19 @@ def main() -> None:
             ).on_conflict_do_nothing(index_elements=["key"])
         )
 
-        cars = []
-        for i in range(10):
-            cars.append(
-                {
-                    "car_code": f"CAR-{i + 1:02d}",
-                    "reg_number": f"DM-GA 12-{3450 + i}",
-                    "model": CAR_MODELS[i % len(CAR_MODELS)],
-                    "current_km": START_KM[i],
-                    "status": "maintenance" if i == 6 else "active",  # CAR-07 in workshop
-                }
-            )
-        db.execute(insert(Vehicle).values(cars).on_conflict_do_nothing(index_elements=["car_code"]))
-
-        # Sample drivers and passengers only go into an empty table (a database that already has people,
-        # perhaps under older IDs, is left alone; see app/rename_ids.py). Drivers have no PIN yet: they set
-        # one on first sign-in (PDF 6.1).
-        if not db.scalar(select(func.count()).select_from(Driver)):
-            db.execute(
-                insert(Driver).values(
-                    [
-                        {"employee_id": e, "name": n, "phone": f"01700-0000{i}", "license_no": f"LIC-{i + 1:04d}"}
-                        for i, (e, n) in enumerate(DRIVERS)
-                    ]
-                ).on_conflict_do_nothing(index_elements=["employee_id"])
-            )
-
-        if not db.scalar(select(func.count()).select_from(Passenger)):
-            db.execute(
-                insert(Passenger).values(
-                    [{"employee_id": e, "name": n, "department": d} for e, n, d in PASSENGERS]
-                ).on_conflict_do_nothing(index_elements=["employee_id"])
-            )
+        # The real fleet, only into an empty database. Drivers have no PIN yet: they set one on first sign-in
+        # (PDF 6.1). Employees (passengers) are saved when they first type their ID on the passenger page.
+        if not db.scalar(select(func.count()).select_from(Vehicle)) and not db.scalar(select(func.count()).select_from(Driver)):
+            vendor = db.scalar(select(Vendor).where(func.lower(Vendor.name) == VENDOR_NAME.lower())) or Vendor(name=VENDOR_NAME)
+            db.add(vendor)
+            db.flush()
+            cars, drivers = fleet()
+            for c in cars:
+                db.add(Vehicle(car_code=c["car_code"], reg_number=c["reg_number"], model=c["model"],
+                               owner=VehicleOwner.vendor if c["vendor"] else VehicleOwner.epic,
+                               vendor_id=vendor.id if c["vendor"] else None))
+            for d in drivers:
+                db.add(Driver(employee_id=d["employee_id"], name=d["name"], phone=d["phone"]))
 
         created = []
         for username, role, pw in (("admin", "admin", admin_password), ("viewer", "viewer", viewer_password)):

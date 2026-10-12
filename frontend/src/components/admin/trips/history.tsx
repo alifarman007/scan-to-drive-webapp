@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { useDuration } from "../dashboard/bits";
 
 export type FilterOptions = {
-  cars: { id: number; car_code: string; model: string }[];
+  cars: { id: number; car_code: string; model: string; owner?: "epic" | "vendor" }[];
   drivers: { id: number; name: string; employee_id: string }[];
   departments: string[];
 };
@@ -101,11 +101,18 @@ export function TripHistory({
             className="w-[calc(50%-0.25rem)] sm:w-40"
           >
             <option value="">{t("filter.allCars")}</option>
-            {options.cars.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.car_code} · {c.model}
-              </option>
-            ))}
+            {(["epic", "vendor"] as const).map((o) => {
+              const group = options.cars.filter((c) => (c.owner ?? "epic") === o);
+              return group.length ? (
+                <optgroup key={o} label={t(`filter.carGroup.${o}`)}>
+                  {group.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.car_code} · {c.model}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
           </Select>
           <Select
             aria-label={t("filter.driver")}

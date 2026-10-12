@@ -55,7 +55,7 @@ function DriverStateChip({ driver, size = "sm" }: { driver: Driver; size?: "sm" 
 
 function errorText(t: (k: string) => string, err: unknown) {
   if (err instanceof ApiError) {
-    if (["EMPLOYEE_ID_EXISTS", "DRIVER_HAS_OPEN_TRIP"].includes(err.code)) return t(`errors.${err.code}`);
+    if (["EMPLOYEE_ID_EXISTS", "DRIVER_HAS_OPEN_TRIP", "BAD_ID_FORMAT"].includes(err.code)) return t(`errors.${err.code}`);
     if (err.status === 422) return t("errors.check");
     if (err.status === 0 || err.code === "BACKEND_DOWN") return t("errors.network");
   }
@@ -194,7 +194,7 @@ function DriverCard({ driver }: { driver: Driver }) {
       </div>
       <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted">
         <span>
-          <b className="font-bold text-title tabular-nums">{driver.total_trips}</b> {t("tripsShort")} ·{" "}
+          <b className="font-bold text-title tabular-nums">{driver.total_trips}</b> {t("tripsShort", { count: driver.total_trips })} ·{" "}
           <b className="font-bold text-title tabular-nums">{driver.total_km.toLocaleString("en-US")}</b> km
         </span>
         <RatingBadge rating={driver.rating} />
@@ -497,19 +497,24 @@ function DriverForm({ driver, nextId, onDone }: { driver?: Driver; nextId?: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const idOk = /^[A-Z0-9][A-Z0-9-]{1,39}$/.test(id);
+  const idOk = /^\d{7}$/.test(id); // Epic IDs: 7 digits (backend: driver_id_pattern)
   const nameOk = name.trim().length > 0;
   const phoneOk = !phone.trim() || /^\+?[0-9][0-9 -]{5,28}$/.test(phone.trim());
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setTried(true);
-    if ((!driver && !idOk) || !nameOk || !phoneOk || busy) return;
+    if (!idOk || !nameOk || !phoneOk || busy) return;
     setBusy(true);
     setError(null);
     try {
       const res = driver
-        ? await adminApi.updateDriver(driver.id, { name: name.trim(), phone: phone.trim(), license_no: license.trim() })
+        ? await adminApi.updateDriver(driver.id, {
+            ...(id !== driver.employee_id ? { employee_id: id } : {}),
+            name: name.trim(),
+            phone: phone.trim(),
+            license_no: license.trim(),
+          })
         : await adminApi.addDriver({ employee_id: id, name: name.trim(), phone: phone.trim() || undefined, license_no: license.trim() || undefined });
       onDone(res.driver);
     } catch (err) {
@@ -526,15 +531,31 @@ function DriverForm({ driver, nextId, onDone }: { driver?: Driver; nextId?: stri
           <Avatar name={name || "?"} size={44} />
           <div className="flex min-w-0 flex-col">
             <span className="truncate font-semibold text-title">{name.trim() || t("form.previewName")}</span>
-            <span className="font-mono text-sm text-muted">{id || "DR0000"}</span>
+            <span className="font-mono text-sm text-muted">{id || "1239000"}</span>
           </div>
         </div>
       )}
-      {driver ? null : (
-        <Field label={t("form.id")} htmlFor="drv-id" hint={t("form.idHint")} error={tried && !idOk ? t("form.idBad") : undefined}>
-          <Input id="drv-id" mono value={id} maxLength={40} invalid={tried && !idOk} onChange={(e) => setId(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ""))} />
-        </Field>
-      )}
+      <Field
+        label={t("form.id")}
+        htmlFor="drv-id"
+        hint={driver ? (id !== driver.employee_id ? t("form.idChanged") : t("form.idEditHint")) : t("form.idHint")}
+        error={tried && !idOk ? t("form.idBad") : undefined}
+      >
+        <Input
+          id="drv-id"
+          mono
+          inputMode="numeric"
+          autoComplete="off"
+          value={id}
+          maxLength={7}
+          placeholder="1239001"
+          invalid={tried && !idOk}
+          onChange={(e) => {
+            setId(e.target.value.replace(/\D/g, "").slice(0, 7));
+            setError(null);
+          }}
+        />
+      </Field>
       <Field label={t("form.name")} htmlFor="drv-name" error={tried && !nameOk ? t("form.required") : undefined}>
         <Input id="drv-name" autoFocus autoComplete="off" value={name} maxLength={120} placeholder={t("form.namePlaceholder")} invalid={tried && !nameOk} onChange={(e) => setName(e.target.value)} />
       </Field>

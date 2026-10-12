@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightIcon, SteeringWheelIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, HandshakeIcon, SteeringWheelIcon } from "@phosphor-icons/react";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -167,7 +167,14 @@ function Bay({ car, asOf }: { car: BoardCar; asOf: string }) {
             {ts(car.state)}
           </StatusChip>
         </div>
-        <span className="truncate text-xs text-muted">{car.model}</span>
+        <span className="flex min-w-0 items-center gap-1 text-xs text-muted">
+          {car.vendor_name ? (
+            <HandshakeIcon size={13} weight="fill" className="shrink-0 text-accent" aria-label={t("vendorCar", { vendor: car.vendor_name })}>
+              <title>{t("vendorCar", { vendor: car.vendor_name })}</title>
+            </HandshakeIcon>
+          ) : null}
+          <span className="truncate">{car.model}</span>
+        </span>
       </div>
       {trip ? (
         <div className="mt-auto flex flex-col gap-1 text-sm">
@@ -191,10 +198,16 @@ function Bay({ car, asOf }: { car: BoardCar; asOf: string }) {
         </div>
       ) : (
         <div className="mt-auto flex items-baseline gap-1">
-          <span className="font-mono text-sm font-semibold text-text tabular-nums">
-            {car.current_km.toLocaleString("en-US")}
-          </span>
-          <span className="text-xs text-muted">km</span>
+          {car.current_km ? (
+            <>
+              <span className="font-mono text-sm font-semibold text-text tabular-nums">
+                {car.current_km.toLocaleString("en-US")}
+              </span>
+              <span className="text-xs text-muted">km</span>
+            </>
+          ) : (
+            <span className="text-xs text-muted">{t("kmUnknown")}</span>
+          )}
         </div>
       )}
     </>

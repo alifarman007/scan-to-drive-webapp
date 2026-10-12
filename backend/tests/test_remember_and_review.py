@@ -108,11 +108,11 @@ def test_end_page_without_a_remembered_phone_identifies_with_name(client, db):
     trip_id = start(client, driver, car).json()["trip"]["id"]
     client.post(f"/api/trips/{trip_id}/cant-scan", json={"reason": "Phone battery dead"}, headers=auth("driver", driver.id))
     raw = end_qr(client, driver, trip_id)
-    r = confirm_end(client, raw, employee_id="Qwe1234", name="Mita Rani")
+    r = confirm_end(client, raw, employee_id="1231234", name="Mita Rani")
     assert r.status_code == 200
     t = db.get(Trip, trip_id)
     db.refresh(t)
-    assert t.passenger.employee_id == "QWE1234" and t.passenger.name == "Mita Rani"
+    assert t.passenger.employee_id == "1231234" and t.passenger.name == "Mita Rani"
 
 
 def test_a_stored_name_is_never_shown_to_whoever_types_the_id(client, db):
@@ -130,7 +130,7 @@ def test_a_stored_name_is_never_shown_to_whoever_types_the_id(client, db):
 def test_the_remembered_phone_sees_the_name_it_typed(client, db):
     car, driver = make_car(db), make_driver(db)
     raw = token_of(start(client, driver, car).json()["start_qr"])
-    r = client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "Emp1100", "name": "Sadia Rahman"})
+    r = client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "1231100", "name": "Sadia Rahman"})
     assert r.json()["trip"]["passenger_name"] == "Sadia Rahman"
     trip_id = db.scalar(select(Trip.id).where(Trip.trip_no == r.json()["trip"]["trip_no"]))
-    assert client.get(f"/api/p/{end_qr(client, driver, trip_id)}").json()["you"] == "Sadia Rahman · EMP1100"
+    assert client.get(f"/api/p/{end_qr(client, driver, trip_id)}").json()["you"] == "Sadia Rahman · 1231100"

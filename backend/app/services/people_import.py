@@ -1,8 +1,11 @@
 """Read the passenger list from an Excel file (.xlsx). Columns found by their heading, in any order."""
 import io
+import re
 from dataclasses import dataclass, field
 
 from openpyxl import load_workbook
+
+from app.config import settings
 
 MAX_ROWS = 5000
 
@@ -77,8 +80,8 @@ def parse_passenger_xlsx(data: bytes) -> Parsed:
             problem = "Employee ID is empty"
         elif not name:
             problem = "Name is empty"
-        elif len(emp) > 40:
-            problem = "Employee ID is longer than 40 characters"
+        elif not re.fullmatch(settings.passenger_id_pattern, emp):
+            problem = f"Employee ID {emp} is not in the Epic format (7 digits, for example 1236001)"
         elif len(name) > 120:
             problem = "Name is longer than 120 characters"
         elif len(dept) > 120:

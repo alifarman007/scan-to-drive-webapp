@@ -10,6 +10,12 @@ class VehicleStatus(str, enum.Enum):
     inactive = "inactive"
 
 
+class VehicleOwner(str, enum.Enum):
+    """Who owns the car: Epic Group itself, or a vendor that rents it to Epic (with its own driver)."""
+    epic = "epic"
+    vendor = "vendor"
+
+
 class RecordStatus(str, enum.Enum):
     """Used for drivers, passengers and admin users. Never delete, only deactivate."""
 

@@ -162,7 +162,9 @@
       "spread": "How the stars spread",
       "emptyTitle": "No ratings yet",
       "emptyBody": "Passengers can rate a trip right after they confirm the end."
-    }
+    },
+    "vendorCar": "Vendor car · {vendor}",
+    "kmUnknown": "No km yet"
   },
   "styleguide": {
     "title": "Style guide",
@@ -182,7 +184,7 @@
     "signInTitle": "Sign in",
     "signInLead": "Use your employee ID and 4-digit PIN. This phone keeps you signed in for 30 days.",
     "employeeId": "Employee ID",
-    "employeeIdPlaceholder": "e.g. DR9001",
+    "employeeIdPlaceholder": "e.g. 1239001",
     "pin": "4-digit PIN",
     "firstTimeHint": "First time? Type any 4 digits. You will choose your own PIN on the next screen.",
     "signIn": "Sign in",
@@ -253,7 +255,8 @@
     "maintenanceTitle": "This car is in maintenance",
     "maintenanceBody": "It cannot be used for trips right now. Ask the transport office.",
     "inactiveTitle": "This car is not in use",
-    "inactiveBody": "It has been taken out of service. Ask the transport office."
+    "inactiveBody": "It has been taken out of service. Ask the transport office.",
+    "firstTrip": "First trip in the app"
   },
   "pinInput": {
     "digitsEntered": "{count} of 4 digits entered"
@@ -325,7 +328,8 @@
     "ending": "Ending the trip…",
     "endWithQr": "End trip and show QR",
     "endNoPassenger": "Finish trip",
-    "notYet": "Not yet, keep driving"
+    "notYet": "Not yet, keep driving",
+    "kmHintFirst": "First trip of this car in the app: type the km on the meter."
   },
   "tripErrors": {
     "generic": "Something went wrong. Please try again.",
@@ -455,7 +459,7 @@
     "employee": "Epic employee",
     "visitor": "Visitor",
     "yourId": "Your employee ID",
-    "idHint": "3 letters and 4 digits, as on your ID card. For example EMP2210.",
+    "idHint": "7 digits, as on your ID card. For example 1236001.",
     "triesLeft": "{left, plural, one {# try left} other {# tries left}}",
     "confirmStart": "Yes, start the trip",
     "visitorName": "Your name",
@@ -499,7 +503,7 @@
       "WRONG_PASSENGER_TYPE": "This trip was started by a different kind of passenger. Ask the driver to check.",
       "checkFields": "Please check what you typed.",
       "NAME_REQUIRED": "Please type your name.",
-      "BAD_ID_FORMAT": "That doesn't look like an employee ID. It is 3 letters and 4 digits, like EMP2210.",
+      "BAD_ID_FORMAT": "That doesn't look like an employee ID. It is 7 digits, like 1236001.",
       "PASSENGER_INACTIVE": "This employee ID is turned off. Please ask the transport office."
     },
     "dead": {
@@ -659,7 +663,11 @@
       "allDepartments": "All departments",
       "needsApproval": "Needs approval",
       "officeCheck": "Office to check",
-      "clear": "Clear filters"
+      "clear": "Clear filters",
+      "carGroup": {
+        "epic": "Epic cars",
+        "vendor": "Vendor cars"
+      }
     },
     "columns": {
       "trip": "Trip",
@@ -905,7 +913,7 @@
     "summary": "{cars, plural, one {# car} other {# cars}} · {km} km driven in total",
     "add": "Add car",
     "searchLabel": "Search cars",
-    "searchHint": "Code, plate, model or driver",
+    "searchHint": "Code, plate, model, driver or vendor",
     "filterLabel": "Show",
     "filter": {
       "all": "All",
@@ -922,11 +930,17 @@
       "inactive": "Inactive"
     },
     "alerts": "{count, plural, one {# alert} other {# alerts}}",
-    "tripsShort": "trips",
+    "tripsShort": "{count, plural, one {trip} other {trips}}",
     "emptyTitle": "No car matches",
     "emptyBody": "Try another search or show all cars.",
-    "noneTitle": "No cars yet",
-    "noneBody": "Add the first car, then print its QR sticker.",
+    "noneTitle": {
+      "epic": "No Epic cars yet",
+      "vendor": "No vendor cars yet"
+    },
+    "noneBody": {
+      "epic": "Add the first car, then print its QR sticker.",
+      "vendor": "Add the vendor with “Vendors”, then add its cars."
+    },
     "back": "Cars",
     "notFoundTitle": "Car not found",
     "notFoundBody": "The link may be old. Go back to the list of cars.",
@@ -988,11 +1002,18 @@
       "platePreview": "On the plate",
       "model": "Model",
       "km": "Odometer now (km)",
-      "kmHint": "The first trip cannot start below this.",
+      "kmHint": "Leave it empty if you don't know it: the first trip's start km sets it.",
       "kmBad": "Up to 7 digits.",
       "required": "Please fill this in.",
       "add": "Add car",
-      "save": "Save changes"
+      "save": "Save changes",
+      "owner": "Whose car",
+      "ownerEpic": "Epic's own car",
+      "ownerVendor": "Rented, with driver",
+      "vendor": "Vendor",
+      "noVendors": "No vendor yet. Close this and add one with “Vendors” on the Vendor cars view.",
+      "pickVendor": "Choose the vendor.",
+      "kmPlaceholder": "Not known yet"
     },
     "km": {
       "title": "Correct the km",
@@ -1007,7 +1028,8 @@
       "reason3": "Driven outside the app",
       "reasonPlaceholder": "Or write the reason",
       "reasonNeeded": "Please give a reason.",
-      "save": "Save km"
+      "save": "Save km",
+      "reasonFirst": "First reading of the odometer"
     },
     "errors": {
       "CAR_CODE_EXISTS": "A car with this code already exists.",
@@ -1017,9 +1039,52 @@
       "REASON_REQUIRED": "Please give a reason.",
       "check": "Please check what you typed.",
       "network": "No connection. Try again.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "VENDOR_REQUIRED": "Choose the vendor of this car.",
+      "VENDOR_NOT_FOUND": "This vendor no longer exists. Reload the page.",
+      "VENDOR_EXISTS": "There is already a vendor with this name.",
+      "VENDOR_HAS_CARS": "This vendor still has cars."
     },
-    "waitingWith": "Waiting for the passenger, driver"
+    "waitingWith": "Waiting for the passenger, driver",
+    "backTo": {
+      "epic": "Epic cars",
+      "vendor": "Vendor cars"
+    },
+    "owner": {
+      "label": "Whose cars",
+      "epic": "Epic cars",
+      "epicSub": "Owned by Epic Group",
+      "vendor": "Vendor cars",
+      "vendorSub": "{count, plural, =0 {Rented, no vendor yet} one {Rented from # vendor} other {Rented from # vendors}}",
+      "epicBadge": "Epic Group",
+      "vendorShort": "Vendor"
+    },
+    "vendors": {
+      "filterLabel": "Vendor",
+      "all": "All vendors",
+      "cars": "{count, plural, one {# car} other {# cars}}",
+      "none": "No vendor yet.",
+      "manage": "Vendors",
+      "title": "Vendors",
+      "hint": "Companies that rent cars to Epic, with their drivers. A new name shows on all their cars.",
+      "name": "Vendor name",
+      "save": "Save name",
+      "cancel": "Cancel",
+      "rename": "Rename",
+      "remove": "Remove {name}",
+      "removed": "Vendor removed",
+      "renamed": "Vendor name saved",
+      "added": "{name} added",
+      "add": "Add a vendor",
+      "addShort": "Add",
+      "placeholder": "e.g. Lanka Bangla Enterprise"
+    },
+    "elsewhere": {
+      "epic": "{count, plural, one {# match} other {# matches}} in Epic cars",
+      "vendor": "{count, plural, one {# match} other {# matches}} in Vendor cars"
+    },
+    "kmUnknown": "Km not recorded yet",
+    "kmUnknownHint": "The first trip's start km sets it."
   },
   "drivers": {
     "title": "Drivers",
@@ -1041,7 +1106,7 @@
       "inactive": "Turned off"
     },
     "noPin": "No PIN yet",
-    "tripsShort": "trips",
+    "tripsShort": "{count, plural, one {trip} other {trips}}",
     "emptyTitle": "No driver matches",
     "emptyBody": "Try another search or show all drivers.",
     "noneTitle": "No drivers yet",
@@ -1096,8 +1161,8 @@
       "editTitle": "Edit {name}",
       "previewName": "New driver",
       "id": "Driver ID",
-      "idHint": "The next free ID is filled in. It cannot be changed later.",
-      "idBad": "Letters, digits and dashes, for example DR9005.",
+      "idHint": "7 digits. The next free ID is filled in.",
+      "idBad": "7 digits, for example 1239001.",
       "name": "Full name",
       "namePlaceholder": "As on the licence",
       "phone": "Phone",
@@ -1106,14 +1171,17 @@
       "optional": "Optional",
       "required": "Please fill this in.",
       "add": "Add driver",
-      "save": "Save changes"
+      "save": "Save changes",
+      "idEditHint": "7 digits. The driver signs in with this ID.",
+      "idChanged": "New ID: the driver signs in with it from now on, with the same PIN."
     },
     "errors": {
       "EMPLOYEE_ID_EXISTS": "A driver with this ID already exists.",
       "DRIVER_HAS_OPEN_TRIP": "This driver is on a trip. Finish or close the trip first.",
       "check": "Please check what you typed.",
       "network": "No connection. Try again.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "BAD_ID_FORMAT": "The ID must be 7 digits, for example 1239001."
     },
     "waitingNow": "Waiting for the passenger in {car}"
   },

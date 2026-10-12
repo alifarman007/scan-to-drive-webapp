@@ -2,15 +2,21 @@
 
 import {
   ArrowLeftIcon,
+  ArrowRightIcon,
   ArrowsClockwiseIcon,
+  BuildingsIcon,
   CarIcon,
+  CheckIcon,
   CircleNotchIcon,
   FilePdfIcon,
   GaugeIcon,
+  HandshakeIcon,
   PencilSimpleIcon,
   PlusIcon,
   PrinterIcon,
+  TrashIcon,
   WarningCircleIcon,
+  XIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -30,7 +36,17 @@ import { QrCode } from "@/components/ui/qr-code";
 import { Reveal } from "@/components/ui/reveal";
 import { StatusChip, type Status } from "@/components/ui/status-chip";
 import { ApiError } from "@/lib/api";
-import { adminApi, isSignedOut, stickerHref, toSignIn, type Car, type CarDetail, type CarStatus } from "@/lib/admin-api";
+import {
+  adminApi,
+  isSignedOut,
+  stickerHref,
+  toSignIn,
+  type Car,
+  type CarDetail,
+  type CarOwner,
+  type CarStatus,
+  type Vendor,
+} from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 
 import {
@@ -85,9 +101,14 @@ function nextCarCode(cars: Car[]) {
   return `CAR-${String(Math.max(0, ...numbers) + 1).padStart(2, "0")}`;
 }
 
+const KNOWN_ERRORS = [
+  "CAR_CODE_EXISTS", "REG_NUMBER_EXISTS", "CAR_HAS_OPEN_TRIP", "REASON_REQUIRED", "CAR_EXISTS",
+  "VENDOR_REQUIRED", "VENDOR_NOT_FOUND", "VENDOR_EXISTS", "VENDOR_HAS_CARS",
+];
+
 function errorText(t: (k: string) => string, err: unknown) {
   if (err instanceof ApiError) {
-    if (["CAR_CODE_EXISTS", "REG_NUMBER_EXISTS", "CAR_HAS_OPEN_TRIP", "REASON_REQUIRED", "CAR_EXISTS"].includes(err.code)) return t(`errors.${err.code}`);
+    if (KNOWN_ERRORS.includes(err.code)) return t(`errors.${err.code}`);
     if (err.status === 422) return t("errors.check");
     if (err.status === 0 || err.code === "BACKEND_DOWN") return t("errors.network");
   }
@@ -98,32 +119,64 @@ function errorText(t: (k: string) => string, err: unknown) {
 /*  list                                                                                             */
 /* ------------------------------------------------------------------------------------------------ */
 
-type Filter = "" | "on_trip" | "available" | "maintenance" | "inactive";
+export type Filter = "" | "on_trip" | "available" | "maintenance" | "inactive";
 
-/** All cars as "garage bays": what each car is doing, its plate, odometer and numbers. Search and a state filter. */
-export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initialQ: string; initialFilter: Filter }) {
+const SPRING = { type: "spring", stiffness: 480, damping: 38 } as const;
+
+/** Epic's own cars and the vendors' (rental) cars are two views; inside each, search and a state filter. */
+export function CarsList({
+  cars,
+  vendors,
+  initialQ,
+  initialFilter,
+  initialOwner,
+  initialVendor,
+}: {
+  cars: Car[];
+  vendors: Vendor[];
+  initialQ: string;
+  initialFilter: Filter;
+  initialOwner: CarOwner;
+  initialVendor: string;
+}) {
   const t = useTranslations("cars");
   const user = useAdminUser();
   const router = useRouter();
   const [q, setQ] = useUrlState("q", initialQ);
   const [filter, setFilter] = useUrlState<Filter>("state", initialFilter);
+  const [owner, setOwner] = useUrlState<CarOwner>("owner", initialOwner);
+  const [vendor, setVendor] = useUrlState("vendor", initialVendor);
   const [adding, setAdding] = useState(false);
+  const [managing, setManaging] = useState(false);
+  const [flash, showFlash] = useFlash();
+  const admin = user.role === "admin";
+  const vendorOn = owner === "vendor" && vendors.some((v) => String(v.id) === vendor) ? vendor : "";
+
+  const needle = q.trim().toLowerCase();
+  const matches = (c: Car) =>
+    !needle || [c.car_code, c.reg_number, c.model, c.open_trip?.driver_name ?? "", c.vendor?.name ?? ""].some((x) => x.toLowerCase().includes(needle));
+  const inView = cars.filter((c) => c.owner === owner && (!vendorOn || String(c.vendor?.id) === vendorOn));
+  const ownerCount = (o: CarOwner) => cars.filter((c) => c.owner === o).length;
 
   const count = (f: Filter) =>
-    cars.filter((c) => {
+    inView.filter((c) => {
       const s = carState(c);
       return !f || (f === "on_trip" ? s === "on_trip" || s === "waiting" : s === f);
     }).length;
 
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return cars.filter((c) => {
-      const s = carState(c);
-      if (filter && (filter === "on_trip" ? s !== "on_trip" && s !== "waiting" : s !== filter)) return false;
-      if (!needle) return true;
-      return [c.car_code, c.reg_number, c.model, c.open_trip?.driver_name ?? ""].some((x) => x.toLowerCase().includes(needle));
-    });
-  }, [cars, q, filter]);
+  const shown = useMemo(
+    () =>
+      inView.filter((c) => {
+        const s = carState(c);
+        if (filter && (filter === "on_trip" ? s !== "on_trip" && s !== "waiting" : s !== filter)) return false;
+        return matches(c);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cars, q, filter, owner, vendorOn],
+  );
+  // a search that finds nothing here may find cars in the other view: say so, one tap away
+  const other: CarOwner = owner === "epic" ? "vendor" : "epic";
+  const elsewhere = needle ? cars.filter((c) => c.owner === other && matches(c)).length : 0;
 
   const totalKm = cars.reduce((s, c) => s + c.total_km, 0);
 
@@ -131,7 +184,7 @@ export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initi
     <div className="flex flex-col gap-section">
       <Reveal>
         <PageHeader title={t("title")} summary={t("summary", { cars: cars.length, km: totalKm.toLocaleString("en-US") })}>
-          {user.role === "admin" ? (
+          {admin ? (
             <Button size="md" lift onClick={() => setAdding(true)}>
               <PlusIcon size={18} weight="bold" />
               {t("add")}
@@ -139,6 +192,34 @@ export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initi
           ) : null}
         </PageHeader>
       </Reveal>
+
+      <Reveal delay={0.03}>
+        <OwnerTabs
+          owner={owner}
+          onChange={(o) => {
+            setOwner(o);
+            setVendor("");
+          }}
+          epic={ownerCount("epic")}
+          vendor={ownerCount("vendor")}
+          vendors={vendors.length}
+        />
+      </Reveal>
+
+      <AnimatePresence initial={false}>
+        {owner === "vendor" ? (
+          <motion.div
+            key="vendor-bar"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="-my-1 overflow-hidden py-1"
+          >
+            <VendorBar vendors={vendors} value={vendorOn} onChange={setVendor} admin={admin} onManage={() => setManaging(true)} />
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <Reveal delay={0.05} className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <SearchBox value={q} onChange={setQ} label={t("searchLabel")} placeholder={t("searchHint")} className="lg:w-80" />
@@ -157,11 +238,26 @@ export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initi
         />
       </Reveal>
 
+      {elsewhere ? (
+        <button
+          type="button"
+          onClick={() => {
+            setOwner(other);
+            setVendor("");
+            setFilter("");
+          }}
+          className="-mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-soft px-3.5 py-1.5 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
+        >
+          {t(`elsewhere.${other}`, { count: elsewhere })}
+          <ArrowRightIcon size={14} weight="bold" />
+        </button>
+      ) : null}
+
       {shown.length === 0 ? (
         <EmptyList
-          icon={<CarIcon size={28} weight="duotone" />}
-          title={cars.length ? t("emptyTitle") : t("noneTitle")}
-          body={cars.length ? t("emptyBody") : t("noneBody")}
+          icon={owner === "vendor" ? <HandshakeIcon size={28} weight="duotone" /> : <CarIcon size={28} weight="duotone" />}
+          title={inView.length ? t("emptyTitle") : t(`noneTitle.${owner}`)}
+          body={inView.length ? t("emptyBody") : t(`noneBody.${owner}`)}
         />
       ) : (
         <motion.ul layout className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -174,7 +270,7 @@ export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initi
                 animate={{ opacity: 1, y: 0, transition: { delay: Math.min(i, 12) * 0.03, duration: 0.35, ease: [0.22, 1, 0.36, 1] } }}
                 exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
               >
-                <CarCard car={car} />
+                <CarCard car={car} showVendor={vendors.length > 1} />
               </motion.li>
             ))}
           </AnimatePresence>
@@ -186,13 +282,295 @@ export function CarsList({ cars, initialQ, initialFilter }: { cars: Car[]; initi
         onOpenChange={setAdding}
         suggestCode={nextCarCode(cars)}
         models={[...new Set(cars.map((c) => c.model))]}
+        vendors={vendors}
+        defaultOwner={owner}
+        defaultVendor={vendorOn ? Number(vendorOn) : (vendors.length === 1 ? vendors[0].id : null)}
         onSaved={(car) => router.push(`/admin/cars/${car.id}?new=1`)}
       />
+      <VendorsModal
+        open={managing}
+        onOpenChange={setManaging}
+        vendors={vendors}
+        onChanged={(text) => {
+          showFlash(text);
+          router.refresh();
+        }}
+      />
+      {flash}
     </div>
   );
 }
 
-function CarCard({ car }: { car: Car }) {
+/** The two views as big tabs: Epic Group's own cars, and cars rented from vendors. */
+function OwnerTabs({
+  owner,
+  onChange,
+  epic,
+  vendor,
+  vendors,
+}: {
+  owner: CarOwner;
+  onChange: (o: CarOwner) => void;
+  epic: number;
+  vendor: number;
+  vendors: number;
+}) {
+  const t = useTranslations("cars.owner");
+  const tabs = [
+    { value: "epic" as const, Icon: BuildingsIcon, label: t("epic"), sub: t("epicSub"), count: epic },
+    { value: "vendor" as const, Icon: HandshakeIcon, label: t("vendor"), sub: t("vendorSub", { count: vendors }), count: vendor },
+  ];
+  return (
+    <div role="tablist" aria-label={t("label")} className="grid grid-cols-2 gap-1.5 rounded-card bg-soft p-1.5 sm:w-fit sm:grid-cols-[repeat(2,minmax(15rem,auto))]">
+      {tabs.map(({ value, Icon, label, sub, count }) => {
+        const on = owner === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(value)}
+            className={cn(
+              "group relative flex min-w-0 items-center gap-2 rounded-[0.95rem] px-2 py-2 text-left outline-none focus-visible:shadow-[0_0_0_3px_var(--ring-soft)] sm:gap-3 sm:px-3 sm:py-2.5",
+              on ? "text-title" : "text-muted hover:text-title",
+            )}
+          >
+            {on ? <motion.span layoutId="cars-owner-tab" className="absolute inset-0 rounded-[0.95rem] bg-card shadow-sm" transition={SPRING} /> : null}
+            <span
+              className={cn(
+                "relative grid size-8 shrink-0 place-items-center rounded-xl transition-colors duration-300 sm:size-10",
+                on ? "bg-accent text-white shadow-[0_6px_14px_-6px_var(--accent)]" : "bg-card/70 text-muted group-hover:text-accent",
+              )}
+            >
+              <motion.span key={String(on)} initial={on ? { rotate: -12, scale: 0.8 } : false} animate={{ rotate: 0, scale: 1 }} transition={SPRING}>
+                <Icon size={21} weight={on ? "fill" : "duotone"} />
+              </motion.span>
+            </span>
+            <span className="relative flex min-w-0 flex-col gap-0.5">
+              <span className="flex items-center gap-1.5 font-display text-sm leading-tight font-bold whitespace-nowrap sm:text-base">
+                {label}
+                <span className={cn("rounded-full px-1.5 text-xs tabular-nums", on ? "bg-soft text-title" : "bg-card/60")}>{count}</span>
+              </span>
+              <span className="hidden truncate text-xs text-muted sm:block">{sub}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Vendor view: which vendor (when there is more than one), and "Vendors" to add or rename them. */
+function VendorBar({
+  vendors,
+  value,
+  onChange,
+  admin,
+  onManage,
+}: {
+  vendors: Vendor[];
+  value: string;
+  onChange: (v: string) => void;
+  admin: boolean;
+  onManage: () => void;
+}) {
+  const t = useTranslations("cars.vendors");
+  return (
+    <div className="flex items-center gap-2">
+      {vendors.length > 1 ? (
+        <Segmented
+          id="cars-vendor"
+          className="min-w-0"
+          label={t("filterLabel")}
+          value={value}
+          onChange={onChange}
+          options={[{ value: "", label: t("all"), count: vendors.reduce((s, v) => s + v.cars, 0) }, ...vendors.map((v) => ({ value: String(v.id), label: v.name, count: v.cars }))]}
+        />
+      ) : vendors.length === 1 ? (
+        <span className="inline-flex h-11 min-w-0 items-center gap-2.5 rounded-control border border-border bg-card px-3.5 text-sm">
+          <HandshakeIcon size={18} weight="duotone" className="shrink-0 text-accent" />
+          <span className="truncate font-bold text-title">{vendors[0].name}</span>
+          <span className="shrink-0 whitespace-nowrap text-muted">· {t("cars", { count: vendors[0].cars })}</span>
+        </span>
+      ) : (
+        <span className="text-sm text-muted">{t("none")}</span>
+      )}
+      {admin ? (
+        <Button variant="secondary" size="md" onClick={onManage} aria-label={t("manage")} className="shrink-0 max-sm:w-11 max-sm:px-0">
+          <PencilSimpleIcon size={17} weight="bold" />
+          <span className="max-sm:hidden">{t("manage")}</span>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Add a vendor, rename one, or remove one that has no cars (added by mistake). */
+function VendorsModal({
+  open,
+  onOpenChange,
+  vendors,
+  onChanged,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  vendors: Vendor[];
+  onChanged: (flash: string) => void;
+}) {
+  const t = useTranslations("cars.vendors");
+  return (
+    <Modal open={open} onOpenChange={onOpenChange} title={t("title")} description={t("hint")}>
+      {open ? <VendorsEditor vendors={vendors} onChanged={onChanged} /> : null}
+    </Modal>
+  );
+}
+
+function VendorsEditor({ vendors, onChanged }: { vendors: Vendor[]; onChanged: (flash: string) => void }) {
+  const t = useTranslations("cars");
+  const [editing, setEditing] = useState<number | null>(null);
+  const [name, setName] = useState("");
+  const [newName, setNewName] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function run(key: string, job: () => Promise<unknown>, flash: string) {
+    setBusy(key);
+    setError(null);
+    try {
+      await job();
+      onChanged(flash);
+      return true;
+    } catch (err) {
+      if (isSignedOut(err)) toSignIn();
+      else setError(errorText(t, err));
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const taken = (n: string, id?: number) => vendors.some((v) => v.id !== id && v.name.toLowerCase() === n.trim().replace(/\s+/g, " ").toLowerCase());
+
+  return (
+    <div className="flex flex-col gap-4">
+      <ul className="flex flex-col divide-y divide-border rounded-2xl border border-border">
+        {vendors.map((v) => (
+          <li key={v.id} className="flex min-h-16 items-center gap-3 px-3.5 py-2.5">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-soft text-accent">
+              <HandshakeIcon size={19} weight="duotone" />
+            </span>
+            {editing === v.id ? (
+              <form
+                className="flex min-w-0 flex-1 items-center gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!name.trim() || taken(name, v.id)) return;
+                  if (await run(`rename-${v.id}`, () => adminApi.renameVendor(v.id, name.trim()), t("vendors.renamed"))) setEditing(null);
+                }}
+              >
+                <Input
+                  autoFocus
+                  aria-label={t("vendors.name")}
+                  value={name}
+                  maxLength={120}
+                  invalid={!name.trim() || taken(name, v.id)}
+                  onChange={(e) => setName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), setEditing(null))}
+                  className="h-11 min-w-0 flex-1"
+                />
+                <Button type="submit" size="md" aria-label={t("vendors.save")} disabled={busy !== null || !name.trim() || taken(name, v.id)}>
+                  {busy === `rename-${v.id}` ? <CircleNotchIcon size={17} className="animate-spin" /> : <CheckIcon size={17} weight="bold" />}
+                </Button>
+                <Button type="button" variant="ghost" size="md" aria-label={t("vendors.cancel")} onClick={() => setEditing(null)}>
+                  <XIcon size={17} weight="bold" />
+                </Button>
+              </form>
+            ) : (
+              <>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-bold text-title">{v.name}</span>
+                  <span className="text-xs text-muted">{t("vendors.cars", { count: v.cars })}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(v.id);
+                    setName(v.name);
+                    setError(null);
+                  }}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-bold text-accent transition-colors hover:bg-soft"
+                >
+                  <PencilSimpleIcon size={15} weight="bold" />
+                  {t("vendors.rename")}
+                </button>
+                {v.cars === 0 ? (
+                  <button
+                    type="button"
+                    aria-label={t("vendors.remove", { name: v.name })}
+                    disabled={busy !== null}
+                    onClick={() => void run(`remove-${v.id}`, () => adminApi.removeVendor(v.id), t("vendors.removed"))}
+                    className="grid size-9 place-items-center rounded-full text-muted transition-colors hover:bg-bad-bg hover:text-bad-fg"
+                  >
+                    {busy === `remove-${v.id}` ? <CircleNotchIcon size={16} className="animate-spin" /> : <TrashIcon size={16} weight="bold" />}
+                  </button>
+                ) : null}
+              </>
+            )}
+          </li>
+        ))}
+        {vendors.length === 0 ? <li className="px-4 py-5 text-center text-sm text-muted">{t("vendors.none")}</li> : null}
+      </ul>
+
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!newName.trim() || taken(newName)) return;
+          if (await run("add", () => adminApi.addVendor(newName.trim()), t("vendors.added", { name: newName.trim() }))) setNewName("");
+        }}
+      >
+        <label htmlFor="vendor-new" className="text-sm font-semibold text-text">
+          {t("vendors.add")}
+        </label>
+        <div className="flex gap-2">
+          <Input
+            id="vendor-new"
+            value={newName}
+            maxLength={120}
+            placeholder={t("vendors.placeholder")}
+            invalid={taken(newName)}
+            onChange={(e) => setNewName(e.target.value)}
+            className="min-w-0 flex-1"
+          />
+          <Button type="submit" size="lg" disabled={busy !== null || !newName.trim() || taken(newName)}>
+            {busy === "add" ? <CircleNotchIcon size={18} className="animate-spin" /> : <PlusIcon size={18} weight="bold" />}
+            {t("vendors.addShort")}
+          </Button>
+        </div>
+        {taken(newName) ? <p className="text-sm font-medium text-bad-fg">{t("errors.VENDOR_EXISTS")}</p> : null}
+      </form>
+      {error ? <p role="alert" className="text-sm font-semibold text-bad-fg">{error}</p> : null}
+    </div>
+  );
+}
+
+/** The odometer, or a quiet note for a new car whose km was never recorded (the first trip sets it). */
+function CarKm({ car, size }: { car: Car; size: "sm" | "lg" }) {
+  const t = useTranslations("cars");
+  if (car.km_known) return size === "lg" ? <Odometer value={car.current_km} size="lg" unit="km" /> : <Odometer value={car.current_km} size="sm" rollIn={false} />;
+  return (
+    <span className={cn("inline-flex items-center gap-2 text-muted", size === "lg" ? "h-[54px] text-sm" : "h-7 text-xs")}>
+      <GaugeIcon size={size === "lg" ? 22 : 16} weight="duotone" className="shrink-0 text-accent/70" />
+      <span className="flex flex-col leading-tight">
+        <span className="font-semibold text-text">{t("kmUnknown")}</span>
+        {size === "lg" ? <span className="text-xs">{t("kmUnknownHint")}</span> : null}
+      </span>
+    </span>
+  );
+}
+
+function CarCard({ car, showVendor }: { car: Car; showVendor: boolean }) {
   const t = useTranslations("cars");
   const state = carState(car);
   return (
@@ -209,6 +587,12 @@ function CarCard({ car }: { car: Car }) {
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-display text-2xl leading-none font-bold text-title">{car.car_code}</span>
           <span className="truncate text-sm text-muted">{car.model}</span>
+          {showVendor && car.vendor ? (
+            <span className="inline-flex min-w-0 items-center gap-1 text-xs font-semibold text-accent">
+              <HandshakeIcon size={13} weight="fill" className="shrink-0" />
+              <span className="truncate">{car.vendor.name}</span>
+            </span>
+          ) : null}
         </div>
         <CarStateChip car={car} />
       </div>
@@ -222,10 +606,10 @@ function CarCard({ car }: { car: Car }) {
         ) : null}
       </div>
       <div className="mt-auto flex items-end justify-between gap-3 border-t border-border pt-3">
-        <Odometer value={car.current_km} size="sm" rollIn={false} />
+        <CarKm car={car} size="sm" />
         <div className="flex flex-col items-end gap-1 text-right text-xs text-muted">
           <span>
-            <b className="font-bold text-title tabular-nums">{car.total_trips}</b> {t("tripsShort")} ·{" "}
+            <b className="font-bold text-title tabular-nums">{car.total_trips}</b> {t("tripsShort", { count: car.total_trips })} ·{" "}
             <b className="font-bold text-title tabular-nums">{car.total_km.toLocaleString("en-US")}</b> km
           </span>
           <RatingBadge rating={car.rating} />
@@ -238,6 +622,27 @@ function CarCard({ car }: { car: Car }) {
           <span className="ml-auto shrink-0 font-mono whitespace-nowrap">{car.open_trip.trip_no}</span>
         </div>
       ) : null}
+    </Link>
+  );
+}
+
+/** "Epic Group" or the vendor's name, next to the plate on the car page. */
+function OwnerBadge({ car }: { car: Car }) {
+  const t = useTranslations("cars.owner");
+  if (!car.vendor)
+    return (
+      <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-soft px-3 text-sm font-bold text-title">
+        <BuildingsIcon size={16} weight="duotone" className="text-accent" />
+        {t("epicBadge")}
+      </span>
+    );
+  return (
+    <Link
+      href={`/admin/cars?owner=vendor&vendor=${car.vendor.id}`}
+      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-soft px-3 text-sm font-bold text-title transition-colors hover:bg-accent hover:text-white"
+    >
+      <HandshakeIcon size={16} weight="duotone" />
+      {car.vendor.name}
     </Link>
   );
 }
@@ -266,9 +671,9 @@ export function CarDetailView({ data, isNew }: { data: CarDetail; isNew: boolean
   return (
     <div className="flex flex-col gap-section">
       <Reveal className="flex flex-col gap-3">
-        <Link href="/admin/cars" className="inline-flex w-fit items-center gap-1.5 rounded-lg text-sm font-bold text-accent hover:underline">
+        <Link href={`/admin/cars?owner=${car.owner}`} className="inline-flex w-fit items-center gap-1.5 rounded-lg text-sm font-bold text-accent hover:underline">
           <ArrowLeftIcon size={15} weight="bold" />
-          {t("back")}
+          {t(`backTo.${car.owner}`)}
         </Link>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex min-w-0 flex-col gap-2">
@@ -279,6 +684,7 @@ export function CarDetailView({ data, isNew }: { data: CarDetail; isNew: boolean
             <div className="flex flex-wrap items-center gap-3 text-muted">
               <span className="font-semibold text-text">{car.model}</span>
               <Plate reg={car.reg_number} />
+              <OwnerBadge car={car} />
             </div>
           </div>
           {admin ? (
@@ -316,7 +722,7 @@ export function CarDetailView({ data, isNew }: { data: CarDetail; isNew: boolean
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div className="flex flex-col gap-2">
                   <span className="text-xs font-bold tracking-wide text-muted uppercase">{t("odometer")}</span>
-                  <Odometer value={car.current_km} size="lg" unit="km" />
+                  <CarKm car={car} size="lg" />
                 </div>
                 {car.open_trip ? (
                   <Link
@@ -377,7 +783,16 @@ export function CarDetailView({ data, isNew }: { data: CarDetail; isNew: boolean
         </div>
       </div>
 
-      <CarFormModal open={editing} onOpenChange={setEditing} car={car} models={[car.model]} onSaved={() => saved(t("saved"))} />
+      <CarFormModal
+        open={editing}
+        onOpenChange={setEditing}
+        car={car}
+        models={[car.model]}
+        vendors={data.vendors}
+        defaultOwner={car.owner}
+        defaultVendor={car.vendor?.id ?? null}
+        onSaved={() => saved(t("saved"))}
+      />
       <KmFixModal open={fixingKm} onOpenChange={setFixingKm} car={car} onSaved={() => saved(t("kmSaved"))} />
       {flash}
     </div>
@@ -563,6 +978,9 @@ function CarFormModal({
   car,
   suggestCode,
   models,
+  vendors,
+  defaultOwner,
+  defaultVendor,
   onSaved,
 }: {
   open: boolean;
@@ -571,30 +989,65 @@ function CarFormModal({
   car?: Car;
   suggestCode?: string;
   models: string[];
+  vendors: Vendor[];
+  defaultOwner: CarOwner;
+  defaultVendor: number | null;
   onSaved: (car: Car) => void;
 }) {
   const t = useTranslations("cars");
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={car ? t("form.editTitle", { code: car.car_code }) : t("form.addTitle")} description={car ? undefined : t("form.addHint")}>
       {/* a fresh form each time it opens */}
-      {open ? <CarForm car={car} suggestCode={suggestCode} models={models} onDone={(c) => { onOpenChange(false); onSaved(c); }} /> : null}
+      {open ? (
+        <CarForm
+          car={car}
+          suggestCode={suggestCode}
+          models={models}
+          vendors={vendors}
+          defaultOwner={defaultOwner}
+          defaultVendor={defaultVendor}
+          onDone={(c) => {
+            onOpenChange(false);
+            onSaved(c);
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }
 
-function CarForm({ car, suggestCode, models, onDone }: { car?: Car; suggestCode?: string; models: string[]; onDone: (car: Car) => void }) {
+function CarForm({
+  car,
+  suggestCode,
+  models,
+  vendors,
+  defaultOwner,
+  defaultVendor,
+  onDone,
+}: {
+  car?: Car;
+  suggestCode?: string;
+  models: string[];
+  vendors: Vendor[];
+  defaultOwner: CarOwner;
+  defaultVendor: number | null;
+  onDone: (car: Car) => void;
+}) {
   const t = useTranslations("cars");
   const [code, setCode] = useState(car?.car_code ?? suggestCode ?? "");
   const [reg, setReg] = useState(car?.reg_number ?? "");
   const [model, setModel] = useState(car?.model ?? "");
   const [km, setKm] = useState("");
+  const [owner, setOwner] = useState<CarOwner>(defaultOwner);
+  const [vendorId, setVendorId] = useState<number | null>(defaultVendor);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const codeOk = /^[A-Z0-9][A-Z0-9-]{1,19}$/.test(code);
   const kmOk = km === "" || (/^\d{1,7}$/.test(km) && Number(km) <= 9_999_999);
-  const ok = (car || codeOk) && reg.trim() && model.trim() && kmOk;
+  const vendorOk = owner === "epic" || vendors.some((v) => v.id === vendorId);
+  const ok = (car || codeOk) && reg.trim() && model.trim() && kmOk && vendorOk;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -602,10 +1055,11 @@ function CarForm({ car, suggestCode, models, onDone }: { car?: Car; suggestCode?
     if (!ok || busy) return;
     setBusy(true);
     setError(null);
+    const who = { owner, vendor_id: owner === "vendor" ? vendorId : null };
     try {
       const res = car
-        ? await adminApi.updateCar(car.id, { reg_number: reg.trim(), model: model.trim() })
-        : await adminApi.addCar({ car_code: code, reg_number: reg.trim(), model: model.trim(), current_km: Number(km || 0), status: "active" });
+        ? await adminApi.updateCar(car.id, { reg_number: reg.trim(), model: model.trim(), ...who })
+        : await adminApi.addCar({ car_code: code, reg_number: reg.trim(), model: model.trim(), current_km: Number(km || 0), status: "active", ...who });
       onDone(res.car);
     } catch (err) {
       if (isSignedOut(err)) return toSignIn();
@@ -616,12 +1070,77 @@ function CarForm({ car, suggestCode, models, onDone }: { car?: Car; suggestCode?
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-sm font-semibold text-text">{t("form.owner")}</legend>
+        <div role="radiogroup" aria-label={t("form.owner")} className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { value: "epic", Icon: BuildingsIcon, label: t("owner.epicBadge"), sub: t("form.ownerEpic") },
+              { value: "vendor", Icon: HandshakeIcon, label: t("owner.vendorShort"), sub: t("form.ownerVendor") },
+            ] as const
+          ).map(({ value, Icon, label, sub }) => {
+            const on = owner === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => setOwner(value)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-control border-[1.5px] px-3 py-2.5 text-left transition-[border-color,background-color,box-shadow]",
+                  on ? "border-accent bg-soft shadow-[0_0_0_3px_var(--ring-soft)]" : "border-border-strong hover:border-accent/60",
+                )}
+              >
+                <Icon size={22} weight={on ? "fill" : "duotone"} className={cn("shrink-0", on ? "text-accent" : "text-muted")} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-bold text-title">{label}</span>
+                  <span className="truncate text-xs text-muted">{sub}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <AnimatePresence initial={false}>
+          {owner === "vendor" ? (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              {vendors.length ? (
+                <div role="radiogroup" aria-label={t("form.vendor")} className="flex flex-wrap gap-2 pt-1">
+                  {vendors.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={vendorId === v.id}
+                      onClick={() => setVendorId(v.id)}
+                      className={cn(
+                        "inline-flex h-10 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-sm font-semibold transition-colors",
+                        vendorId === v.id ? "border-accent bg-accent text-white" : "border-border-strong text-title hover:bg-soft",
+                      )}
+                    >
+                      {vendorId === v.id ? <CheckIcon size={14} weight="bold" /> : null}
+                      {v.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="pt-1 text-sm text-muted">{t("form.noVendors")}</p>
+              )}
+              {tried && !vendorOk && vendors.length ? <p role="alert" className="pt-1.5 text-sm font-medium text-bad-fg">{t("form.pickVendor")}</p> : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </fieldset>
       {car ? null : (
         <Field label={t("form.code")} htmlFor="car-code" hint={t("form.codeHint")} error={tried && !codeOk ? t("form.codeBad") : undefined}>
           <Input
             id="car-code"
             mono
-            autoFocus
             value={code}
             maxLength={20}
             invalid={tried && !codeOk}
@@ -633,7 +1152,6 @@ function CarForm({ car, suggestCode, models, onDone }: { car?: Car; suggestCode?
         <Input
           id="car-reg"
           mono
-          autoFocus={Boolean(car)}
           value={reg}
           maxLength={40}
           placeholder="DM-GA 12-3456"
@@ -657,7 +1175,7 @@ function CarForm({ car, suggestCode, models, onDone }: { car?: Car; suggestCode?
       </Field>
       {car ? null : (
         <Field label={t("form.km")} htmlFor="car-km" hint={t("form.kmHint")} error={tried && !kmOk ? t("form.kmBad") : undefined}>
-          <Input id="car-km" mono inputMode="numeric" value={km} placeholder="0" invalid={tried && !kmOk} onChange={(e) => setKm(e.target.value.replace(/\D/g, "").slice(0, 7))} />
+          <Input id="car-km" mono inputMode="numeric" value={km} placeholder={t("form.kmPlaceholder")} invalid={tried && !kmOk} onChange={(e) => setKm(e.target.value.replace(/\D/g, "").slice(0, 7))} />
         </Field>
       )}
       {error ? <p role="alert" className="text-sm font-semibold text-bad-fg">{error}</p> : null}
@@ -679,12 +1197,12 @@ function KmFixModal({ open, onOpenChange, car, onSaved }: { open: boolean; onOpe
 
 function KmFixForm({ car, onDone }: { car: Car; onDone: () => void }) {
   const t = useTranslations("cars");
-  const [km, setKm] = useState(String(car.current_km));
+  const [km, setKm] = useState(car.km_known ? String(car.current_km) : "");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const quick = [t("km.reason1"), t("km.reason2"), t("km.reason3")];
+  const quick = car.km_known ? [t("km.reason1"), t("km.reason2"), t("km.reason3")] : [t("km.reasonFirst")];
   const value = Number(km || 0);
   const changed = km !== "" && value !== car.current_km;
   const ok = changed && reason.trim().length > 0;

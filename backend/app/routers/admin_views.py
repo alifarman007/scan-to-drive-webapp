@@ -67,11 +67,28 @@ def _live_trip(t: Trip, now: datetime) -> dict:
 def _who(db: Session, events: list[TripEvent]) -> dict[str, dict]:
     """Audit actors ("driver:EMP-1021", "passenger:EMP-2210", "admin:mary", "visitor:017...", "system") with a
     readable name, so the timeline says who did each step. One query per kind of person."""
-    # IDs renamed later (app/rename_ids.py): old audit lines keep the old ID, so look up the new one
+    # IDs renamed later: old audit lines keep the old ID
+    # (the one-off rename, or an ID changed on the driver / employee page), so follow them to the ID used now.
     renamed = {"driver": {}, "passenger": {}}
-    for detail in db.scalars(select(TripEvent.detail).where(TripEvent.event == "employee_ids_renamed")):
-        for kind, key in (("driver", "drivers"), ("passenger", "passengers")):
-            renamed[kind].update({old.upper(): new.upper() for old, new in (detail or {}).get(key, {}).items()})
+
+    def rename(kind: str, old: str, new: str) -> None:
+        old, new = old.upper(), new.upper()
+        m = renamed[kind]
+        for k, v in m.items():  # A -> B earlier and B -> C now: A -> C
+            if v == old:
+                m[k] = new
+        m[old] = new
+
+    kinds = {"driver_updated": "driver", "passenger_updated": "passenger"}
+    for event, detail in db.execute(select(TripEvent.event, TripEvent.detail).where(
+            TripEvent.event.in_(("employee_ids_renamed", *kinds))).order_by(TripEvent.id)):
+        detail = detail or {}
+        if event == "employee_ids_renamed":
+            for kind, key in (("driver", "drivers"), ("passenger", "passengers")):
+                for old, new in detail.get(key, {}).items():
+                    rename(kind, old, new)
+        elif "employee_id" in (detail.get("before") or {}):
+            rename(kinds[event], detail["before"]["employee_id"], detail["after"]["employee_id"])
 
     def current(kind: str, ref: str) -> str:
         """The ID as it is now: the new ID if it was renamed, otherwise the ID as written."""
@@ -134,6 +151,7 @@ def dashboard(_: AdminUser = Depends(current_admin_user), db: Session = Depends(
         board.append({
             "id": v.id, "car_code": v.car_code, "model": v.model, "reg_number": v.reg_number,
             "current_km": v.current_km, "state": state, "vehicle_status": v.status.value,
+            "owner": v.owner.value, "vendor_name": v.vendor.name if v.vendor else None,
             "trip": None if t is None else {
                 "id": t.id, "trip_no": t.trip_no, "status": t.status.value, "driver_name": t.driver.name,
                 "destination": t.destination, "start_time": t.start_time,
@@ -321,7 +339,8 @@ def trip_detail(
             "department": t.passenger.department},
         visitor=None if not t.is_visitor else {"name": t.visitor_name, "phone": t.visitor_phone, "reason": t.visitor_reason},
         vehicle={"id": t.vehicle.id, "car_code": t.vehicle.car_code, "model": t.vehicle.model,
-                 "reg_number": t.vehicle.reg_number},
+                 "reg_number": t.vehicle.reg_number, "owner": t.vehicle.owner.value,
+                 "vendor_name": t.vehicle.vendor.name if t.vehicle.vendor else None},
         map_points={
             "start": None if t.start_lat is None else {"lat": float(t.start_lat), "lng": float(t.start_lng)},
             "end": None if t.end_lat is None else {"lat": float(t.end_lat), "lng": float(t.end_lng)},

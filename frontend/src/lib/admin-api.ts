@@ -16,6 +16,8 @@ export type BoardCar = {
   current_km: number;
   state: BoardState;
   vehicle_status: "active" | "maintenance" | "inactive";
+  owner: CarOwner;
+  vendor_name: string | null;
   trip: null | { id: number; trip_no: string; status: TripStatus; driver_name: string; destination: string; start_time: string };
 };
 
@@ -73,6 +75,10 @@ export type RatingSummary = { average: number; count: number } | null;
 export type DayActivity = { date: string; trips: number; km: number };
 
 export type CarStatus = "active" | "maintenance" | "inactive";
+/** Epic Group's own car, or rented from a vendor (with the vendor's driver). */
+export type CarOwner = "epic" | "vendor";
+
+export type Vendor = { id: number; name: string; cars: number };
 
 export type Car = {
   id: number;
@@ -80,7 +86,11 @@ export type Car = {
   reg_number: string;
   model: string;
   current_km: number;
+  /** false: the km was never recorded (a new car); the first trip sets it */
+  km_known: boolean;
   status: CarStatus;
+  owner: CarOwner;
+  vendor: { id: number; name: string } | null;
   qr_version: number;
   qr_link: string;
   total_trips: number;
@@ -92,7 +102,8 @@ export type Car = {
   created_at: string;
 };
 
-export type CarDetail = { car: Car; recent_trips: HistoryTrip[]; km_by_day: DayActivity[] };
+export type CarDetail = { car: Car; recent_trips: HistoryTrip[]; km_by_day: DayActivity[]; vendors: Vendor[] };
+export type CarList = { total: number; cars: Car[]; vendors: Vendor[] };
 
 export type Driver = {
   id: number;
@@ -225,7 +236,7 @@ export type TripDetail = {
     driver: { id: number; employee_id: string; name: string; phone: string | null };
     passenger: { id: number; employee_id: string; name: string | null; department: string | null } | null;
     visitor: { name: string; phone: string; reason: string | null } | null;
-    vehicle: { id: number; car_code: string; model: string; reg_number: string };
+    vehicle: { id: number; car_code: string; model: string; reg_number: string; owner: CarOwner; vendor_name: string | null };
     map_points: { start: { lat: number; lng: number } | null; end: { lat: number; lng: number } | null };
     photos: { start: TripPhotoInfo; end: TripPhotoInfo };
     approved_by_name: string | null;
@@ -246,15 +257,22 @@ export const adminApi = {
   decideApproval: (id: number, decision: "approved" | "rejected", note: string) =>
     api(`/admin/trips/${id}/approval`, { json: { decision, note } }),
 
-  addCar: (car: { car_code: string; reg_number: string; model: string; current_km: number; status: CarStatus }) =>
-    api<{ car: Car }>("/admin/cars", { json: car }),
-  updateCar: (id: number, changes: Partial<Pick<Car, "reg_number" | "model" | "status" | "current_km">> & { reason?: string }) =>
-    api<{ car: Car }>(`/admin/cars/${id}`, { method: "PATCH", json: changes }),
+  addCar: (car: {
+    car_code: string; reg_number: string; model: string; current_km: number; status: CarStatus; owner: CarOwner; vendor_id: number | null;
+  }) => api<{ car: Car }>("/admin/cars", { json: car }),
+  updateCar: (
+    id: number,
+    changes: Partial<Pick<Car, "reg_number" | "model" | "status" | "current_km" | "owner">> & { vendor_id?: number | null; reason?: string },
+  ) => api<{ car: Car }>(`/admin/cars/${id}`, { method: "PATCH", json: changes }),
+  vendors: () => api<{ vendors: Vendor[] }>("/admin/vendors"),
+  addVendor: (name: string) => api<{ vendor: Vendor }>("/admin/vendors", { json: { name } }),
+  renameVendor: (id: number, name: string) => api<{ vendor: Vendor }>(`/admin/vendors/${id}`, { method: "PATCH", json: { name } }),
+  removeVendor: (id: number) => api(`/admin/vendors/${id}`, { method: "DELETE" }),
   newSticker: (id: number) => api<{ car: Car }>(`/admin/cars/${id}/new-sticker`, { method: "POST" }),
 
   addDriver: (d: { employee_id: string; name: string; phone?: string; license_no?: string }) =>
     api<{ driver: Driver }>("/admin/drivers", { json: d }),
-  updateDriver: (id: number, changes: Partial<Pick<Driver, "name" | "phone" | "license_no" | "status">>) =>
+  updateDriver: (id: number, changes: Partial<Pick<Driver, "employee_id" | "name" | "phone" | "license_no" | "status">>) =>
     api<{ driver: Driver }>(`/admin/drivers/${id}`, { method: "PATCH", json: changes }),
   resetPin: (id: number) => api<{ driver: Driver }>(`/admin/drivers/${id}/reset-pin`, { method: "POST" }),
 

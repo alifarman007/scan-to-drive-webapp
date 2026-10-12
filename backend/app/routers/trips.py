@@ -121,7 +121,8 @@ def start_trip(
             qr = {"url": url, "expires_at": expires_at}
 
         gap = start_km - vehicle.current_km
-        if gap > app_settings.get_int(db, "km_gap_limit_km"):
+        # current_km 0 = the car's km was never recorded (a new car): this first trip sets it, no gap to check.
+        if vehicle.current_km > 0 and gap > app_settings.get_int(db, "km_gap_limit_km"):
             db.add(Alert(
                 trip_id=trip.id, vehicle_id=vehicle.id, type=AlertType.km_gap,
                 message=(f"{vehicle.car_code} trip {trip.trip_no} started {gap} km above its last end km "

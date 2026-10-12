@@ -22,9 +22,9 @@ def _uid() -> str:
 
 
 def emp_id() -> str:
-    """A random employee ID in the agreed shape (3 letters + 4 digits), e.g. TQX4821."""
+    """A random employee ID in the Epic shape (7 digits), e.g. 1236421."""
     import random
-    return "T" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ", k=2)) + f"{random.randint(0, 9999):04d}"
+    return str(random.randint(1_000_000, 9_999_999))
 
 
 @pytest.fixture()

@@ -246,3 +246,101 @@ def test_sticker_shows_the_car_code_and_text(client, db):
 def test_the_qr_holds_only_the_car_link():
     from app.services.stickers import car_qr_link
     assert car_qr_link("CAR-03", 4).endswith("/c/CAR-03?v=4")
+
+
+# ---- Epic and vendor cars -------------------------------------------------------------------------
+
+def add_vendor(client, admin, name=None):
+    return client.post("/api/admin/vendors", json={"name": name or f"Vendor {uid()}"}, headers=hdr(admin))
+
+
+def test_cars_are_epic_unless_given_a_vendor(client, db):
+    admin = make_admin(db)
+    car = create(client, admin).json()["car"]
+    assert car["owner"] == "epic" and car["vendor"] is None
+    r = create(client, admin, owner="vendor")
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "VENDOR_REQUIRED"
+    assert create(client, admin, owner="vendor", vendor_id=999999).json()["detail"]["code"] == "VENDOR_NOT_FOUND"
+    v = add_vendor(client, admin).json()["vendor"]
+    assert create(client, admin, vendor_id=v["id"]).json()["detail"]["code"] == "VENDOR_FOR_EPIC_CAR"
+    car = create(client, admin, owner="vendor", vendor_id=v["id"]).json()["car"]
+    assert car["owner"] == "vendor" and car["vendor"] == {"id": v["id"], "name": v["name"]}
+    assert audit(db, "car_created", car["id"])[0].detail["vendor_id"] == v["id"]
+
+
+def test_a_car_moves_between_epic_and_vendors(client, db):
+    admin = make_admin(db)
+    v1, v2 = add_vendor(client, admin).json()["vendor"], add_vendor(client, admin).json()["vendor"]
+    car = create(client, admin).json()["car"]
+    assert patch(client, admin, car["id"], owner="vendor").json()["detail"]["code"] == "VENDOR_REQUIRED"
+    r = patch(client, admin, car["id"], owner="vendor", vendor_id=v1["id"])
+    assert r.status_code == 200 and r.json()["car"]["vendor"]["id"] == v1["id"]
+    r = patch(client, admin, car["id"], vendor_id=v2["id"])  # another vendor
+    assert r.json()["car"]["vendor"]["id"] == v2["id"]
+    r = patch(client, admin, car["id"], owner="epic")  # back to Epic: the vendor goes with it
+    assert r.json()["car"]["owner"] == "epic" and r.json()["car"]["vendor"] is None
+    ev = audit(db, "car_updated", car["id"])[-1]
+    assert ev.detail["before"]["owner"] == "vendor" and ev.detail["after"] == {"owner": "epic", "vendor_id": None}
+    assert db.get(Vehicle, car["id"]).vendor_id is None
+
+
+def test_list_filters_by_owner_and_vendor_and_lists_vendors(client, db):
+    admin = make_admin(db)
+    name = f"Lanka {uid()}"
+    v = add_vendor(client, admin, name).json()["vendor"]
+    mine = create(client, admin, owner="vendor", vendor_id=v["id"]).json()["car"]
+    epic = create(client, admin).json()["car"]
+    body = client.get("/api/admin/cars", params={"owner": "vendor"}, headers=hdr(admin)).json()
+    codes = [c["car_code"] for c in body["cars"]]
+    assert mine["car_code"] in codes and epic["car_code"] not in codes
+    assert {"id": v["id"], "name": name, "cars": 1} in body["vendors"]
+    by_vendor = client.get("/api/admin/cars", params={"vendor_id": v["id"]}, headers=hdr(admin)).json()["cars"]
+    assert [c["car_code"] for c in by_vendor] == [mine["car_code"]]
+    found = client.get("/api/admin/cars", params={"q": name.lower()}, headers=hdr(admin)).json()["cars"]  # search by vendor name
+    assert [c["car_code"] for c in found] == [mine["car_code"]]
+
+
+def test_vendors_are_added_renamed_and_removed_only_without_cars(client, db):
+    admin = make_admin(db)
+    name = f"Lanka {uid()}"
+    r = add_vendor(client, admin, f"  {name}  ")
+    assert r.status_code == 201 and r.json()["vendor"]["name"] == name
+    v = r.json()["vendor"]
+    assert add_vendor(client, admin, name.upper()).json()["detail"]["code"] == "VENDOR_EXISTS"
+    assert add_vendor(client, admin, "  ").status_code == 422
+    car = create(client, admin, owner="vendor", vendor_id=v["id"]).json()["car"]
+
+    new = f"Lanka Bangla {uid()}"
+    r = client.patch(f"/api/admin/vendors/{v['id']}", json={"name": new}, headers=hdr(admin))
+    assert r.status_code == 200 and r.json()["vendor"] == {"id": v["id"], "name": new, "cars": 1}
+    assert client.get(f"/api/admin/cars/{car['id']}", headers=hdr(admin)).json()["car"]["vendor"]["name"] == new
+    ev = [e for e in db.scalars(select(TripEvent).where(TripEvent.event == "vendor_renamed")) if e.detail["vendor_id"] == v["id"]]
+    assert ev[0].detail == {"vendor_id": v["id"], "before": name, "after": new}
+
+    r = client.delete(f"/api/admin/vendors/{v['id']}", headers=hdr(admin))
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "VENDOR_HAS_CARS"
+    patch(client, admin, car["id"], owner="epic")
+    assert client.delete(f"/api/admin/vendors/{v['id']}", headers=hdr(admin)).status_code == 204
+    assert client.patch(f"/api/admin/vendors/{v['id']}", json={"name": "X"}, headers=hdr(admin)).status_code == 404
+
+
+def test_viewers_see_vendors_but_cannot_change_them(client, db):
+    admin, viewer = make_admin(db), make_admin(db, role=AdminRole.viewer)
+    v = add_vendor(client, admin).json()["vendor"]
+    assert any(x["id"] == v["id"] for x in client.get("/api/admin/vendors", headers=hdr(viewer)).json()["vendors"])
+    assert client.post("/api/admin/vendors", json={"name": "X"}, headers=hdr(viewer)).status_code == 403
+    assert client.patch(f"/api/admin/vendors/{v['id']}", json={"name": "X"}, headers=hdr(viewer)).status_code == 403
+    assert client.delete(f"/api/admin/vendors/{v['id']}", headers=hdr(viewer)).status_code == 403
+
+
+def test_a_new_car_without_km_takes_the_first_trip_start_km_without_a_gap_alert(client, db):
+    from app.models import Alert
+    admin, driver = make_admin(db), make_driver(db)
+    car = create(client, admin, current_km=0).json()["car"]
+    assert car["km_known"] is False
+    page = client.get(f"/api/cars/{car['car_code']}", headers=auth("driver", driver.id)).json()
+    assert page["car"]["last_end_km"] is None  # nothing to hint yet
+    r = start(client, driver, db.get(Vehicle, car["id"]), start_km=48210, with_passenger="false", purpose="Office errand")
+    assert r.status_code == 201, r.text
+    trip_id = r.json()["trip"]["id"]
+    assert db.scalars(select(Alert).where(Alert.trip_id == trip_id)).all() == []

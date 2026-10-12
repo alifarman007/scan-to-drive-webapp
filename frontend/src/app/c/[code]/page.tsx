@@ -61,6 +61,7 @@ export default async function CarRoute({ params, searchParams }: Props) {
     <CarHeader
       page={page}
       label={t("lastEndKm")}
+      firstTrip={t("firstTrip")}
       status={inUse ? t("carStatus.in_use") : t(`carStatus.${page.car.status}`)}
       inUse={inUse}
       startTitle={t("startTitle")}
@@ -104,7 +105,21 @@ export default async function CarRoute({ params, searchParams }: Props) {
   );
 }
 
-function CarHeader({ page, label, status, inUse, startTitle }: { page: CarPage; label: string; status: string; inUse: boolean; startTitle: string }) {
+function CarHeader({
+  page,
+  label,
+  firstTrip,
+  status,
+  inUse,
+  startTitle,
+}: {
+  page: CarPage;
+  label: string;
+  firstTrip: string;
+  status: string;
+  inUse: boolean;
+  startTitle: string;
+}) {
   const { car } = page;
   return (
     <Reveal className="flex items-end justify-between gap-3">
@@ -119,8 +134,14 @@ function CarHeader({ page, label, status, inUse, startTitle }: { page: CarPage; 
         </StatusChip>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <Odometer value={car.last_end_km} size="sm" framed={false} />
-        <span className="text-[0.7rem] text-sky">{label}</span>
+        {car.last_end_km === null ? (
+          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[0.7rem] font-semibold text-sky">{firstTrip}</span>
+        ) : (
+          <>
+            <Odometer value={car.last_end_km} size="sm" framed={false} />
+            <span className="text-[0.7rem] text-sky">{label}</span>
+          </>
+        )}
       </div>
     </Reveal>
   );

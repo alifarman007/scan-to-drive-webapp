@@ -853,8 +853,9 @@ Frontend:
 - [x] The phone shrinks the photo to 2048 px (JPEG 92 %) before sending, so it uploads fast on mobile data; the server does the rest.
 - [x] Trip page "Check the meter": red line "The same photo is on trip T-005077. Check it." (or "The start and end photos are the same
       picture. Check the km."), and the zoom shows the photo size (2048×1536 · 412 KB).
-- [x] App icon (navy, scan frame and road), icon for iPhone home screen, and "Add to home screen" on Android opens the driver page
-      as an app (`manifest.ts`, `public/icons/`).
+- [x] App icon: the navy Epic logo on white (traced from `public/brand/epic-logo-navy.png` into a sharp vector, so it stays crisp at
+      every size), icon for iPhone home screen, and "Add to home screen" on Android opens the driver page as an app (`src/app/icon.svg`,
+      `apple-icon.png`, `manifest.ts`, `public/icons/`).
 - [x] Wrong address (404): a road that ends at a barrier, a little car drives up and stops with hazard lights blinking; Start page / Driver
       page buttons, language and theme. Errors: the same picture with a broken road, "Try again" and an error code for the office.
 - [x] Loading screens (grey shapes in the page layout) for the admin pages, the driver page, the car page and the passenger page.
@@ -878,6 +879,71 @@ Frontend:
 
 Phase 1 is complete with this step. Next: Docker and Azure (moving to the server), then the hidden pages and reading the km from the
 photo (OCR).
+
+### 2026-10-12 (real fleet: Epic and vendor cars, 7-digit IDs)
+
+Got the real lists from the transport office: "EPIC GROUP CORPORATE OWN VEHICLE LIST" (14 cars with their drivers) and
+"LIST OF RENTAL VEHICLES - LANKA BANGLA ENTERPRISE" (10 cars with their drivers).
+
+Backend (migration 0007):
+- [x] Vendors: new table `vendors` (name, can be changed). Every car is now either Epic's own (`owner = epic`) or a vendor's
+      (`owner = vendor` + `vendor_id`); the database refuses a vendor car without a vendor and an Epic car with one.
+- [x] Cars API: `owner`, `vendor` and `km_known` on every car; list filters `owner` and `vendor_id`; search also finds the vendor's
+      name; the list and the car page also return the vendors (with how many cars each has). Add / edit a car with `owner` and
+      `vendor_id` (a car can move between Epic and a vendor, or to another vendor; logged).
+- [x] `/api/admin/vendors`: list, add, rename, and remove (only a vendor with no cars, for one added by mistake). Logged.
+- [x] IDs are 7 digits now, for drivers (`1239001` ...) and Epic employees (`1236001` ...): `driver_id_pattern` and
+      `passenger_id_pattern` in `app/config.py`. Checked when adding or editing a driver or employee, on the passenger page and in the
+      Excel import (rows in another format are listed and skipped). The next free driver ID is one more than the highest.
+- [x] A driver's ID (and an employee's) can be changed now. The driver signs in with the new ID and the same PIN; old trips still show
+      the driver's name.
+- [x] A car whose km was never recorded (0, as all the real cars now): its first trip's start km becomes its km, with no "km gap" alert.
+      The car page sends `last_end_km: null` for it.
+- [x] Real fleet in `app/fleet_data.py`: 24 cars CAR-01 ... CAR-14 (Epic) and CAR-15 ... CAR-24 (Lanka Bangla Enterprise), plates written
+      one way (`DM-GA 27-6992`), 24 drivers `1239001` ... `1239024` in list order (Epic drivers first, then the vendor drivers).
+      Placeholders until Epic sends them: Epic car models "Toyota", the same dummy phone `01752156244` for every driver, no licence
+      numbers, km not known. Vendor models from the list: Toyota Axio, Toyota HiAce, Toyota Esquire.
+- [x] `python -m app.load_fleet` replaces all test data with the real fleet: shows what it would remove and add; `--apply` does it.
+      Removes every trip (with photos, QR codes, reviews, alerts), the audit log, all cars, drivers, employees and vendors; keeps admin
+      and viewer accounts, settings and trip purposes; trip numbers start again at T-000001. Once done it refuses to run again (that
+      would delete real trips) unless `--again` is added too. Phones signed in as a test driver are signed out.
+- [x] `python -m app.seed` on a new, empty database now loads the real fleet instead of the sample cars and drivers. No sample
+      employees any more: a dummy employee could show a wrong name for a real person's ID; employees are saved the first time they
+      type their ID on the passenger page (or with the Excel import when the real list comes).
+- [x] `docs/passenger-import-template.xlsx` examples use 7-digit IDs.
+- [x] 324 tests pass (16 new: vendors, owner, moving a car, list filters, vendor rename/remove, viewers, first trip of a new car,
+      7-digit IDs, changing a driver's ID, timeline after an ID change, the fleet lists).
+
+Frontend:
+- [x] Cars page has two views as big tabs at the top: **Epic cars** (owned by Epic Group) and **Vendor cars** (rented, with the count of
+      vendors). Search and the state switch work inside each view; a search with nothing here but matches in the other view shows
+      "8 matches in Vendor cars" to jump there. The view is kept in the address (`/admin/cars?owner=vendor`).
+- [x] Vendor view: the vendor's name and car count (a switch per vendor when there is more than one) and **Vendors**: add a vendor,
+      rename one, remove one without cars.
+- [x] Add car / Edit car: "Whose car" with Epic Group or Vendor, then the vendor. The next code is filled in (CAR-25). The km can be
+      left empty ("Not known yet").
+- [x] Car page: an "Epic Group" or vendor badge next to the plate (the vendor badge opens that vendor's cars); back link goes to the
+      right view. A car without km says "Km not recorded yet, the first trip's start km sets it"; "Correct km" offers "First reading of
+      the odometer" as the reason.
+- [x] Dashboard car tiles: a small handshake mark on vendor cars, "No km yet" for cars without km. Trip page shows the vendor next to the
+      car. Trip history car filter is split into Epic cars and Vendor cars.
+- [x] Drivers: the ID box takes 7 digits only (number pad), the next free ID is filled in, and the ID can be changed when editing
+      ("New ID: the driver signs in with it from now on, with the same PIN").
+- [x] Driver sign-in: number pad and "e.g. 1239001". Driver's start form for a car new in the app: the km box is empty with "First trip
+      of this car in the app: type the km on the meter", and the car header says "First trip in the app" instead of the odometer.
+- [x] Passenger page: employee ID with the number pad, "1236001" as the example, and "7 digits, as on your ID card".
+- [x] Avatars skip "Md." and similar titles ("Md. Dainul Haque" shows DH, not MD). "1 trip" instead of "1 trips".
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox with the real fleet loaded: both views, search jump, add / rename / remove a vendor (duplicate name
+      refused), add a vendor car and move it to Epic, vendor car page, driver ID edit (short and taken IDs refused), a vendor driver's
+      first trip (no km-gap alert, T-000001), old-style passenger ID refused and a 7-digit one accepted, dashboard, trip page, trip
+      filter groups; laptop and phone, light, dark and Bangla. No sideways scrolling, no browser errors. Lint, types and build pass.
+- [ ] To verify on the laptop: `python -m alembic upgrade head`, then `python -m app.load_fleet` (read the list) and
+      `python -m app.load_fleet --apply`; sign in as a driver (e.g. 1239001, any 4 digits the first time) and start a first trip;
+      print the 24 stickers.
+- [ ] To confirm with Epic: the drivers' real IDs and phone numbers, the Epic car models, whether the two "Md. Shariful Islam" (CAR-02
+      and CAR-05) are two people (now two drivers, 1239002 and 1239005; turn one off if it is the same person), and "Md. ShaAlam" (kept
+      as written in the list).
 
 ## Database (PDF section 16)
 
@@ -910,6 +976,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 - `trips.is_visitor`, `visitor_name`, `visitor_phone`, `visitor_reason` (migration 0002, for passengers who are not EPIC employees).
 - `trips.passenger_key_hash` (the phone that confirmed the start), `trip_reviews` (passenger rating), `passengers.name` optional (migration 0005).
 - `trip_photos.width`, `height`, `size_bytes`, `original_bytes`, `sha256` (photo details and fingerprint, migration 0006).
+- `vendors` (companies that rent cars to Epic), `vehicles.owner` (`epic` / `vendor`) and `vehicles.vendor_id` (migration 0007).
 - `created_at` / `updated_at` columns on most tables.
 
 ### Assumptions to confirm
@@ -919,6 +986,8 @@ completed trips locked except admin corrections with a reason; never delete cars
   `allow_visitors=1` is the developer's choice (visitors allowed).
 - Drivers are seeded **without** a PIN; they set one on first sign-in (PDF 6.1). Admin and viewer
   passwords are random, printed once by the seed script (dev only).
+- Real fleet (`app/fleet_data.py`): driver IDs, phone numbers and Epic car models are placeholders until Epic sends them.
+  A car's km 0 means "not recorded yet".
 
 ## How to run (from `backend/`, PowerShell)
 
@@ -929,7 +998,8 @@ copy .env.example .env        # first time only, then edit DATABASE_URL and SECR
 python -m alembic upgrade head   # create/update tables
 python -m app.rename_ids         # only for a database made before 2026-10-11: shows the new IDs; add --apply to rename
 python -m app.recompress_photos  # only for photos saved before step 9: shows what would change; add --apply to do it
-python -m app.seed               # sample cars, drivers, passengers, admin, settings (prints admin/viewer passwords once)
+python -m app.load_fleet         # once, to go live: shows the test data it removes and the real fleet it adds; --apply does it
+python -m app.seed               # new empty database: settings, admin/viewer (passwords printed once), the real fleet
 python -m pytest -q              # all backend tests
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000   # API at http://127.0.0.1:8000, docs at /api/docs
 python -m app.worker             # second PowerShell window: background alert checks every minute (run only one)
@@ -988,7 +1058,9 @@ npm run start:lan             # run the production build for phones (faster than
 7. The laptop's address can change when it reconnects to the Wi-Fi; the script always shows the current one and makes a new certificate
    when it changes (accept the warning again on the phones).
 8. Still not loading on a phone: open `https://<address>:3000/api/health` on it. A reply means the network is fine; a timeout means the
-   firewall or a guest Wi-Fi is blocking it.
+   firewall or a guest Wi-Fi is blocking it. `ERR_ADDRESS_UNREACHABLE` means the phone is not on the same network as the laptop:
+   put the laptop and all phones on the same band (on my router, a laptop on 5 GHz could not be reached from phones on 2.4 GHz),
+   and turn off VPN and mobile data on the phone.
 
 ## API so far
 
@@ -1027,15 +1099,19 @@ npm run start:lan             # run the production build for phones (faster than
 | GET | `/api/admin/trips/{id}` | admin / viewer | trip detail: people, map points, photo links with size and "same photo on trip ...", timeline, alerts |
 | GET | `/api/admin/photos/{trip_id}/{kind}` | signed link | dashboard photo, link valid 10 minutes |
 | GET | `/api/admin/audit` | admin | audit log search |
-| GET | `/api/admin/cars` | admin / viewer | car list with totals and open trip; filters `q`, `status` |
-| GET | `/api/admin/cars/{id}` | admin / viewer | one car, totals, rating, last 10 trips, km per day (30 days) |
-| POST | `/api/admin/cars` | admin | add a car |
-| PATCH | `/api/admin/cars/{id}` | admin | edit registration, model, status; correct km with a reason |
+| GET | `/api/admin/cars` | admin / viewer | car list with totals, open trip, owner and vendor; filters `q`, `status`, `owner`, `vendor_id`; also the vendors |
+| GET | `/api/admin/cars/{id}` | admin / viewer | one car, totals, rating, last 10 trips, km per day (30 days), the vendors |
+| POST | `/api/admin/cars` | admin | add a car (Epic or a vendor's) |
+| PATCH | `/api/admin/cars/{id}` | admin | edit registration, model, owner / vendor, status; correct km with a reason |
+| GET | `/api/admin/vendors` | admin / viewer | vendors with their number of cars |
+| POST | `/api/admin/vendors` | admin | add a vendor |
+| PATCH | `/api/admin/vendors/{id}` | admin | rename a vendor |
+| DELETE | `/api/admin/vendors/{id}` | admin | remove a vendor that has no cars |
 | POST | `/api/admin/cars/{id}/new-sticker` | admin | new sticker version; the old sticker stops working |
 | GET | `/api/admin/cars/{id}/qr.pdf` | admin | printable QR sticker (`layout=sticker` or `a4`) |
 | GET | `/api/admin/drivers` | admin / viewer | driver list with totals, ratings and the next free driver ID; `/{id}` adds last trips and km per day |
 | POST | `/api/admin/drivers` | admin | add a driver (no PIN) |
-| PATCH | `/api/admin/drivers/{id}` | admin | edit driver, set active / inactive |
+| PATCH | `/api/admin/drivers/{id}` | admin | edit driver (also the 7-digit ID), set active / inactive |
 | POST | `/api/admin/drivers/{id}/reset-pin` | admin | remove the PIN; driver sets a new one at next sign-in |
 | GET | `/api/admin/passengers` | admin / viewer | employee list with filters and paging; also `/{id}` and `/departments` |
 | POST | `/api/admin/passengers` | admin | add an employee |
@@ -1078,7 +1154,7 @@ README.md                  this file
 docs/                      the project plan PDF
 backend/
   alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text,
-                           0005_typed_passengers_reviews, 0006_photo_details)
+                           0005_typed_passengers_reviews, 0006_photo_details, 0007_vendors)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -1110,6 +1186,8 @@ backend/
   app/seed.py              development seed data
   app/rename_ids.py        one-off: new driver IDs (DR9001 ...) and passenger IDs without the dash, keeping all trips
   app/recompress_photos.py one-off: older photos to the same standard as new ones
+  app/fleet_data.py        the real cars and drivers (from the transport office lists)
+  app/load_fleet.py        one-off: replace the test data with the real fleet
   app/set_password.py      command to change/create admin passwords
   tests/test_db_rules.py   checks that the DB enforces the business rules
   tests/test_auth.py       sign-in, lockout and role-guard tests
@@ -1128,6 +1206,7 @@ backend/
   tests/test_cant_scan.py  passenger can't scan and admin approval
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
   tests/test_photos.py     photo cleaning and the same photo used twice
+  tests/test_fleet_data.py the real fleet lists (plates, models, IDs)
 frontend/                  Next.js app
   messages/en.json, bn.json  all texts, English and Bangla
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
@@ -1167,15 +1246,17 @@ frontend/                  Next.js app
 
 ## Next steps
 
-Phase 1 (steps 1 to 9) is done.
+Phase 1 (steps 1 to 9) is done, and the real fleet is in.
 
-1. Verify the unchecked items above (steps 7, 8 and 9) on the laptop and phones, including a full phone test over HTTPS, and commit.
+1. Verify the unchecked items above (steps 7, 8, 9 and the real fleet) on the laptop and phones, including a full phone test over
+   HTTPS, and commit. Then `python -m app.load_fleet --apply` and print the stickers.
 2. Docker and Azure: containers for the backend, frontend and worker, Azure Blob Storage for photos, production settings
    (forwarded IP headers, secure cookies, real certificate).
 3. Later, when wanted: Reports, Passengers, Audit log and Driver overtime pages (hidden in the menus now).
 4. Reading the km from the dashboard photo (OCR): every photo is already stored the same way for it (`app/services/photos.py`).
 5. Backend still open: a Bangla font for PDF reports.
-6. To confirm with Epic: the final employee ID format (only `passenger_id_pattern` in `app/config.py` and the hint texts change).
+6. From Epic: the drivers' real IDs and phones, the Epic car models, the employee list (Excel import), the Shariful Islam question
+   (see the real fleet entry). The ID format is 7 digits now (`app/config.py`, with the hint texts).
 
 ## Conventions for whoever continues
 

@@ -11,7 +11,7 @@ import { Field, Input } from "@/components/ui/input";
 import { Odometer } from "@/components/ui/odometer";
 import { Reveal } from "@/components/ui/reveal";
 import { ApiError } from "@/lib/api";
-import { PHONE_RE, cleanId, openTripOnThisPhone, passengerApi, type EndConfirmed, type EndPage } from "@/lib/passenger-api";
+import { ID_EXAMPLE, PHONE_RE, cleanId, idIsNumeric, openTripOnThisPhone, passengerApi, type EndConfirmed, type EndPage } from "@/lib/passenger-api";
 
 import { EmployeeForm, SlideSwap, VisitorForm, WhoPicker, type Mode } from "./identity-forms";
 import { CodeTimer, DeadCode, ErrorText, PhotoButton, Shake, SuccessMark, TripCard, useErrorText } from "./pieces";
@@ -115,6 +115,7 @@ export function EndFlow({ token, page }: { token: string; page: EndPage }) {
                 <EndForm
                   token={token}
                   as={page.confirm_as}
+                  idPattern={page.id_pattern}
                   triesLeft={page.tries_left}
                   focus={typing !== "no"}
                   onDone={finished}
@@ -208,6 +209,7 @@ function TripNumbers({ startKm, endKm, distance, minutes }: { startKm: number; e
 function EndForm({
   token,
   as,
+  idPattern,
   triesLeft,
   focus = false,
   onDone,
@@ -215,6 +217,7 @@ function EndForm({
 }: {
   token: string;
   as: EndPage["confirm_as"];
+  idPattern: string;
   triesLeft: number;
   /** put the cursor in the box straight away (the remembered phone chose, or had, to type) */
   focus?: boolean;
@@ -267,8 +270,8 @@ function EndForm({
             autoCapitalize={isPhone ? undefined : "characters"}
             spellCheck={false}
             type={isPhone ? "tel" : "text"}
-            inputMode={isPhone ? "tel" : "text"}
-            placeholder={isPhone ? "01XXX XXXXXX" : "EMP2210"}
+            inputMode={isPhone ? "tel" : idIsNumeric(idPattern) ? "numeric" : "text"}
+            placeholder={isPhone ? "01XXX XXXXXX" : ID_EXAMPLE}
             value={value}
             onChange={(e) => {
               setValue(isPhone ? e.target.value : cleanId(e.target.value));

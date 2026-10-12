@@ -48,7 +48,8 @@ export function StartForm({ page }: { page: CarPage }) {
   const { car } = page;
   const { geo, retry } = useGeolocation();
 
-  const [km, setKm] = useState(String(car.last_end_km));
+  const lastKm = car.last_end_km; // null for a car new in the app: nothing to compare with
+  const [km, setKm] = useState(lastKm === null ? "" : String(lastKm));
   const [startPlace, setStartPlace] = useState(car.last_end_place ?? "");
   const [destination, setDestination] = useState("");
   const [withPassenger, setWithPassenger] = useState(true);
@@ -80,8 +81,8 @@ export function StartForm({ page }: { page: CarPage }) {
   }, []);
 
   const kmNum = /^\d{1,7}$/.test(km.trim()) ? Number(km.trim()) : NaN;
-  const kmTooLow = Number.isFinite(kmNum) && kmNum < car.last_end_km;
-  const kmGap = Number.isFinite(kmNum) ? kmNum - car.last_end_km : 0;
+  const kmTooLow = lastKm !== null && Number.isFinite(kmNum) && kmNum < lastKm;
+  const kmGap = lastKm !== null && Number.isFinite(kmNum) ? kmNum - lastKm : 0;
   const kmWarn = !kmTooLow && kmGap > page.km_gap_limit_km;
 
   // the "fill in the marked fields" note goes away as soon as nothing is marked any more
@@ -134,7 +135,7 @@ export function StartForm({ page }: { page: CarPage }) {
       if (key === "PURPOSE_REQUIRED") setMissing({ purpose: true });
       if (key === "PHOTO_TOO_LARGE" || key === "INVALID_PHOTO") setMissing({ photo: true });
       if (key === "DRIVER_HAS_OPEN_TRIP" || key === "OPEN_TRIP_EXISTS" || key === "CAR_IN_USE") router.refresh();
-      setError(te(key, { km: car.last_end_km, detail: err instanceof ApiError ? err.message : "" }));
+      setError(te(key, { km: lastKm ?? 0, detail: err instanceof ApiError ? err.message : "" }));
     }
   }
 
@@ -146,8 +147,14 @@ export function StartForm({ page }: { page: CarPage }) {
             <Field
               label={t("startKm")}
               htmlFor="f-km"
-              error={kmTooLow ? t("kmTooLow", { km: car.last_end_km.toLocaleString("en-US") }) : missing.km ? t("kmRequired") : undefined}
-              hint={!kmTooLow && !missing.km && !kmWarn ? t("kmHint", { km: car.last_end_km.toLocaleString("en-US") }) : undefined}
+              error={kmTooLow ? t("kmTooLow", { km: (lastKm ?? 0).toLocaleString("en-US") }) : missing.km ? t("kmRequired") : undefined}
+              hint={
+                !kmTooLow && !missing.km && !kmWarn
+                  ? lastKm === null
+                    ? t("kmHintFirst")
+                    : t("kmHint", { km: lastKm.toLocaleString("en-US") })
+                  : undefined
+              }
             >
               <Input
                 id="f-km"

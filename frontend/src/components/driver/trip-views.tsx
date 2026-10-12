@@ -24,7 +24,7 @@ import { Reveal, Stagger, StaggerItem } from "@/components/ui/reveal";
 import { StatusChip } from "@/components/ui/status-chip";
 import { driverApi, saveQr, type ActiveTrip, type Trip } from "@/lib/driver-api";
 import { useGeolocation, useNowSeconds } from "@/lib/hooks";
-import { cn } from "@/lib/utils";
+import { cn, personInitials } from "@/lib/utils";
 
 import { DriverFrame } from "./driver-frame";
 import { LocationField } from "./location-field";
@@ -71,14 +71,6 @@ function Route({ from, to, fromNote, toNote }: { from: string; to: string; fromN
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-}
 
 function PassengerRow({ trip }: { trip: Trip }) {
   const t = useTranslations("tripView");
@@ -99,7 +91,7 @@ function PassengerRow({ trip }: { trip: Trip }) {
   return (
     <div className="flex items-center gap-3">
       <span className="inline-flex size-11 items-center justify-center rounded-full bg-soft font-display font-semibold text-title">
-        {name ? initials(name) : <UserIcon size={20} />}
+        {name ? personInitials(name) : <UserIcon size={20} />}
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-bold">{name ?? t("passengerUnconfirmed")}</span>

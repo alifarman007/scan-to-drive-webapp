@@ -31,15 +31,14 @@ def test_car_and_driver_pages_show_km_per_day_and_rating(client, db):
     assert row["rating"]["count"] == 1
 
 
-def test_next_driver_id_and_ids_in_capitals(client, db):
+def test_next_driver_id_is_the_next_seven_digit_number(client, db):
     admin = make_admin(db)
-    numbers = [int(e[2:]) for e in db.scalars(select(Driver.employee_id)) if e.upper().startswith("DR") and e[2:].isdigit()]
-    expected = f"DR{max(numbers, default=9000) + 1}"
+    numbers = [int(e) for e in db.scalars(select(Driver.employee_id)) if len(e) == 7 and e.isdigit()]
+    expected = str(max(numbers, default=1239000) + 1)
     assert client.get("/api/admin/drivers", headers=hdr(admin)).json()["next_employee_id"] == expected
-    r = client.post("/api/admin/drivers", json={"employee_id": expected.lower(), "name": "New Driver"}, headers=hdr(admin))
+    r = client.post("/api/admin/drivers", json={"employee_id": f" {expected} ", "name": "New Driver"}, headers=hdr(admin))
     assert r.status_code == 201 and r.json()["driver"]["employee_id"] == expected
-    db.execute(Driver.__table__.delete().where(Driver.employee_id == expected))
-    db.commit()
+    assert client.get("/api/admin/drivers", headers=hdr(admin)).json()["next_employee_id"] == str(int(expected) + 1)
 
 
 def test_alert_filters_counts_and_names(client, db):

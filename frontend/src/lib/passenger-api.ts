@@ -107,7 +107,13 @@ export const DEAD_CODES = new Set([
 /** The ID as it is stored: capitals, no spaces or dashes ("emp-2210" becomes "EMP2210"). */
 export const cleanId = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-/** Does the ID have the agreed shape? The pattern comes from the backend (it is not final yet). */
+/** Epic IDs are digits only (7, e.g. 1236001): then the phone shows its number pad. Read from the backend's pattern. */
+export const ID_EXAMPLE = "1236001";
+export function idIsNumeric(pattern: string) {
+  return /^\^(\[0-9\]|\\d)\{\d+(,\d*)?\}\$$/.test(pattern);
+}
+
+/** Does the ID have the agreed shape? The pattern comes from the backend (app/config.py). */
 export function idLooksRight(id: string, pattern: string) {
   try {
     return new RegExp(pattern, "i").test(id);

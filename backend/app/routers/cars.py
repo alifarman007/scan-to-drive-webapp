@@ -40,7 +40,8 @@ def car_page(
             "reg_number": vehicle.reg_number,
             "model": vehicle.model,
             "status": vehicle.status.value,
-            "last_end_km": vehicle.current_km,  # shown as a hint in the start form
+            # shown as a hint in the start form; null = not recorded yet (new car), the first trip sets it
+            "last_end_km": vehicle.current_km or None,
             "qr_version": vehicle.qr_version,
             "last_end_place": last_end_place,
         },

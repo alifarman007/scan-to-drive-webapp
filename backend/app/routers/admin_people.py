@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.deps import current_admin_user, get_db, require_admin
 from app.errors import api_error
 from app.models import AdminUser, Driver, OPEN_TRIP_STATUSES, Passenger, RecordStatus, Trip, TripStatus
@@ -53,6 +54,7 @@ class DriverCreate(_Person):
 
 
 class DriverUpdate(_Person):
+    employee_id: str | None = Field(default=None, min_length=1, max_length=40)
     name: str | None = Field(default=None, min_length=1, max_length=120)
     phone: str | None = Field(default=None, max_length=30)
     license_no: str | None = Field(default=None, max_length=60)
@@ -67,6 +69,7 @@ class PassengerCreate(_Person):
 
 
 class PassengerUpdate(_Person):
+    employee_id: str | None = Field(default=None, min_length=1, max_length=40)
     name: str | None = Field(default=None, min_length=1, max_length=120)
     department: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=30)
@@ -100,9 +103,17 @@ def _check_changes(body: BaseModel) -> dict:
     changes = body.model_dump(exclude_unset=True)
     if not changes:
         raise api_error(422, "NOTHING_TO_CHANGE", "Send at least one field to change")
-    if any(changes.get(k) is None for k in ("name", "status") if k in changes):
-        raise api_error(422, "FIELD_REQUIRED", "Name and status cannot be empty")
+    if any(changes.get(k) is None for k in ("employee_id", "name", "status") if k in changes):
+        raise api_error(422, "FIELD_REQUIRED", "ID, name and status cannot be empty")
     return changes
+
+
+def _check_id(value: str, pattern: str, example: str) -> str:
+    """Epic IDs are 7 digits (app/config.py). Returns the ID without spaces around it."""
+    value = value.strip()
+    if not re.fullmatch(pattern, value):
+        raise api_error(422, "BAD_ID_FORMAT", f"The ID must be 7 digits, for example {example}", example=example)
+    return value
 
 
 # ================= drivers =================
@@ -148,13 +159,13 @@ def _full_driver(db: Session, d: Driver) -> dict:
     return driver_out(d, _driver_stats(db, [d.id]).get(d.id), _open_trip_of(db, d.id), ratings_by(db, Trip.driver_id, [d.id]).get(d.id))
 
 
-DRIVER_ID_RE = re.compile(r"^DR(\d+)$", re.I)
+FIRST_DRIVER_ID = 1239001
 
 
 def next_driver_id(db: Session) -> str:
-    """The next free driver ID in the DR9001 style."""
-    numbers = [int(m.group(1)) for e in db.scalars(select(Driver.employee_id)) if (m := DRIVER_ID_RE.match(e))]
-    return f"DR{max(numbers, default=9000) + 1}"
+    """The next free 7-digit driver ID: one more than the highest so far (1239001 for the first)."""
+    numbers = [int(e) for e in db.scalars(select(Driver.employee_id)) if re.fullmatch(r"\d{7}", e)]
+    return str(max(numbers, default=FIRST_DRIVER_ID - 1) + 1)
 
 
 @drivers.get("")
@@ -194,9 +205,10 @@ def create_driver(
     admin: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
 ):
     """Add a driver. No PIN is set here: the driver chooses a 4-digit PIN at the first sign-in."""
-    if _exists(db, Driver, body.employee_id):
-        raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A driver with employee ID {body.employee_id} already exists")
-    d = Driver(employee_id=body.employee_id.upper(), name=body.name, phone=_clean(body.phone), license_no=_clean(body.license_no))
+    emp = _check_id(body.employee_id, settings.driver_id_pattern, "1239001")
+    if _exists(db, Driver, emp):
+        raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A driver with employee ID {emp} already exists")
+    d = Driver(employee_id=emp, name=body.name, phone=_clean(body.phone), license_no=_clean(body.license_no))
     db.add(d)
     try:
         db.flush()
@@ -214,17 +226,25 @@ def update_driver(
     driver_id: int, body: DriverUpdate, request: Request,
     admin: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
 ):
-    """Edit name, phone, licence number, or set status inactive / active. The employee ID cannot be changed.
-    A driver with an open trip cannot be deactivated: close or finish the trip first."""
+    """Edit the ID, name, phone, licence number, or set status inactive / active. After an ID change the driver
+    signs in with the new ID (same PIN). A driver with an open trip cannot be deactivated: close or finish it first."""
     changes = _check_changes(body)
     d = _get_driver(db, driver_id, lock=True)
+    if "employee_id" in changes:
+        changes["employee_id"] = _check_id(changes["employee_id"], settings.driver_id_pattern, "1239001")
+        if _exists(db, Driver, changes["employee_id"], exclude_id=d.id):
+            raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A driver with employee ID {changes['employee_id']} already exists")
     if changes.get("status") == RecordStatus.inactive and d.status == RecordStatus.active and _open_trip_of(db, d.id):
         raise api_error(409, "DRIVER_HAS_OPEN_TRIP", "This driver has an open trip. Close or finish it first.")
     before, after = _apply(d, changes)
     if before:
         log_event(db, request, "driver_updated", f"admin:{admin.username}",
                   detail={"driver_id": d.id, "employee_id": d.employee_id, "before": before, "after": after})
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise api_error(409, "EMPLOYEE_ID_EXISTS", "A driver with this employee ID already exists")
     return {"driver": _full_driver(db, d)}
 
 
@@ -309,9 +329,10 @@ def create_passenger(
     body: PassengerCreate, request: Request,
     admin: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
 ):
-    if _exists(db, Passenger, body.employee_id):
-        raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A passenger with employee ID {body.employee_id} already exists")
-    p = Passenger(employee_id=body.employee_id, name=body.name, department=_clean(body.department), phone=_clean(body.phone))
+    emp = _check_id(body.employee_id, settings.passenger_id_pattern, "1236001")
+    if _exists(db, Passenger, emp):
+        raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A passenger with employee ID {emp} already exists")
+    p = Passenger(employee_id=emp, name=body.name, department=_clean(body.department), phone=_clean(body.phone))
     db.add(p)
     try:
         db.flush()
@@ -329,15 +350,23 @@ def update_passenger(
     passenger_id: int, body: PassengerUpdate, request: Request,
     admin: AdminUser = Depends(require_admin), db: Session = Depends(get_db),
 ):
-    """Edit name, department, phone, or set status inactive / active. The employee ID cannot be changed.
+    """Edit the ID, name, department, phone, or set status inactive / active.
     An inactive employee can no longer be named as a passenger (the passenger page says "ID not found")."""
     changes = _check_changes(body)
     p = _get_passenger(db, passenger_id, lock=True)
+    if "employee_id" in changes:
+        changes["employee_id"] = _check_id(changes["employee_id"], settings.passenger_id_pattern, "1236001")
+        if _exists(db, Passenger, changes["employee_id"], exclude_id=p.id):
+            raise api_error(409, "EMPLOYEE_ID_EXISTS", f"A passenger with employee ID {changes['employee_id']} already exists")
     before, after = _apply(p, changes)
     if before:
         log_event(db, request, "passenger_updated", f"admin:{admin.username}",
                   detail={"passenger_id": p.id, "employee_id": p.employee_id, "before": before, "after": after})
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise api_error(409, "EMPLOYEE_ID_EXISTS", "A passenger with this employee ID already exists")
     return {"passenger": passenger_out(p, _passenger_stats(db, [p.id]).get(p.id))}
 
 

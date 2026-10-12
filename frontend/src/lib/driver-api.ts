@@ -55,7 +55,8 @@ export type CarPage = {
     reg_number: string;
     model: string;
     status: "active" | "maintenance" | "inactive";
-    last_end_km: number;
+    /** null: the car's km was never recorded (new in the app); this first trip sets it */
+    last_end_km: number | null;
     qr_version: number;
     last_end_place: string | null;
   };

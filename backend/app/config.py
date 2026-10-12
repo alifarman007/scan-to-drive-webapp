@@ -25,8 +25,10 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
 
     # Employee IDs typed on the passenger page must look like this (there is no staff list to check them against).
-    # Default: 3 letters and 4 digits, e.g. EMP2210. Letter case does not matter. Change it here when the format is fixed.
-    passenger_id_pattern: str = r"^[A-Za-z]{3}[0-9]{4}$"
+    # Epic IDs are 7 digits, e.g. 1236001. Change it here if the format changes.
+    passenger_id_pattern: str = r"^[0-9]{7}$"
+    # Driver IDs given in the admin pages (add / edit driver): also 7 digits, e.g. 1239001.
+    driver_id_pattern: str = r"^[0-9]{7}$"
     # Base address of the web app; QR codes are links like {public_base_url}/p/<token>.
     public_base_url: str = "http://localhost:3000"
     # Where dashboard photos are saved in development (Azure Blob Storage comes later).

@@ -10,7 +10,7 @@ import { TripStatusChip } from "@/components/admin/trip-status";
 import { Card } from "@/components/ui/card";
 import type { DayActivity, HistoryTrip, RatingSummary } from "@/lib/admin-api";
 import { useScrollFade } from "@/lib/hooks";
-import { cn } from "@/lib/utils";
+import { cn, personInitials } from "@/lib/utils";
 
 /*
  * Pieces shared by the Cars, Drivers and Alerts pages: page header, search box, a segmented switch with a
@@ -163,10 +163,7 @@ const AVATAR_TONES = [
   "from-[#a3182f] to-[#e2566f]",
 ];
 
-export function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
-}
+export const initials = personInitials;
 
 /** Initials on a soft gradient; the colour comes from the name, so a person always has the same one. */
 export function Avatar({ name, size = 48, dim, className }: { name: string; size?: number; dim?: boolean; className?: string }) {

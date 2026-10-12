@@ -20,6 +20,11 @@ def uid():
     return uuid.uuid4().hex[:6].upper()
 
 
+def seven() -> str:
+    """A random 7-digit ID away from the real ranges (1236..., 1239...)."""
+    return str(2_000_000 + uuid.uuid4().int % 7_000_000)
+
+
 def audit(db, name, key, value):
     return [e for e in db.scalars(select(TripEvent).where(TripEvent.event == name)) if e.detail.get(key) == value]
 
@@ -31,22 +36,23 @@ def req(client, admin, method, path, **kw):
 # ================= drivers =================
 
 def add_driver(client, admin, **kw):
-    body = {"employee_id": f"D-{uid()}", "name": "Abdul Karim", "phone": "01711000000", "license_no": "LIC-77"}
+    body = {"employee_id": seven(), "name": "Abdul Karim", "phone": "01711000000", "license_no": "LIC-77"}
     body.update(kw)
     return req(client, admin, "POST", "/drivers", json=body)
 
 
 def test_admin_adds_a_driver_who_then_chooses_a_pin(client, db):
     admin = make_admin(db)
-    r = add_driver(client, admin, employee_id="  D-NEW-1 ")
+    new = seven()
+    r = add_driver(client, admin, employee_id=f"  {new} ")
     assert r.status_code == 201
     d = r.json()["driver"]
-    assert d["employee_id"] == "D-NEW-1" and d["status"] == "active" and d["has_pin"] is False and d["total_trips"] == 0
+    assert d["employee_id"] == new and d["status"] == "active" and d["has_pin"] is False and d["total_trips"] == 0
     assert audit(db, "driver_created", "driver_id", d["id"])[0].actor == f"admin:{admin.username}"
     # the new driver signs in: PIN not set yet, then sets one, then signs in with it
-    assert client.post("/api/auth/driver/login", json={"employee_id": "D-NEW-1", "pin": "1234"}).status_code == 409
-    assert client.post("/api/auth/driver/set-pin", json={"employee_id": "D-NEW-1", "pin": "2580"}).status_code == 200
-    assert client.post("/api/auth/driver/login", json={"employee_id": "D-NEW-1", "pin": "2580"}).status_code == 200
+    assert client.post("/api/auth/driver/login", json={"employee_id": new, "pin": "1234"}).status_code == 409
+    assert client.post("/api/auth/driver/set-pin", json={"employee_id": new, "pin": "2580"}).status_code == 200
+    assert client.post("/api/auth/driver/login", json={"employee_id": new, "pin": "2580"}).status_code == 200
     assert req(client, admin, "GET", f"/drivers/{d['id']}").json()["driver"]["has_pin"] is True
 
 
@@ -58,7 +64,7 @@ def test_driver_checks(client, db):
     for bad in ({"employee_id": " "}, {"name": ""}, {"phone": "1" * 31}, {"pin": "1234"}):
         assert add_driver(client, admin, **bad).status_code == 422, bad
     # optional fields may be left out or blank
-    r = req(client, admin, "POST", "/drivers", json={"employee_id": f"D-{uid()}", "name": "No Phone", "phone": "  "})
+    r = req(client, admin, "POST", "/drivers", json={"employee_id": seven(), "name": "No Phone", "phone": "  "})
     assert r.status_code == 201 and r.json()["driver"]["phone"] is None
 
 
@@ -71,10 +77,35 @@ def test_edit_driver(client, db):
     assert out["name"] == "Abdul K." and out["phone"] is None and out["license_no"] == "LIC-99"
     ev = audit(db, "driver_updated", "driver_id", d["id"])[0]
     assert ev.detail["before"]["name"] == "Abdul Karim" and ev.detail["after"]["phone"] is None
-    assert req(client, admin, "PATCH", f"/drivers/{d['id']}", json={"employee_id": "X"}).status_code == 422  # not changeable
+    assert req(client, admin, "PATCH", f"/drivers/{d['id']}", json={"employee_id": "X"}).json()["detail"]["code"] == "BAD_ID_FORMAT"
     assert req(client, admin, "PATCH", f"/drivers/{d['id']}", json={}).json()["detail"]["code"] == "NOTHING_TO_CHANGE"
     assert req(client, admin, "PATCH", f"/drivers/{d['id']}", json={"name": None}).status_code == 422
     assert req(client, admin, "PATCH", "/drivers/999999", json={"name": "X"}).status_code == 404
+
+
+def test_driver_id_can_be_changed_and_the_driver_signs_in_with_the_new_one(client, db):
+    admin = make_admin(db)
+    d = add_driver(client, admin).json()["driver"]
+    client.post("/api/auth/driver/set-pin", json={"employee_id": d["employee_id"], "pin": "2580"})
+    other = add_driver(client, admin).json()["driver"]
+    r = req(client, admin, "PATCH", f"/drivers/{d['id']}", json={"employee_id": other["employee_id"]})
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "EMPLOYEE_ID_EXISTS"
+    new = seven()
+    r = req(client, admin, "PATCH", f"/drivers/{d['id']}", json={"employee_id": f" {new} "})
+    assert r.status_code == 200 and r.json()["driver"]["employee_id"] == new and r.json()["driver"]["has_pin"] is True
+    ev = audit(db, "driver_updated", "driver_id", d["id"])[-1]
+    assert ev.detail["before"]["employee_id"] == d["employee_id"] and ev.detail["after"]["employee_id"] == new
+    assert client.post("/api/auth/driver/login", json={"employee_id": d["employee_id"], "pin": "2580"}).status_code == 401
+    assert client.post("/api/auth/driver/login", json={"employee_id": new, "pin": "2580"}).status_code == 200
+
+
+def test_new_driver_ids_are_seven_digits(client, db):
+    admin = make_admin(db)
+    for bad in ("DR9001", "123456", "12345678", "123-4567"):
+        r = add_driver(client, admin, employee_id=bad)
+        assert r.status_code == 422 and r.json()["detail"]["code"] == "BAD_ID_FORMAT", bad
+    nxt = req(client, admin, "GET", "/drivers").json()["next_employee_id"]
+    assert len(nxt) == 7 and nxt.isdigit()
 
 
 def test_reset_pin(client, db):
@@ -138,7 +169,7 @@ def test_cancelled_trips_are_counted_separately(client, db):
 # ================= passengers =================
 
 def add_passenger(client, admin, **kw):
-    body = {"employee_id": f"E-{uid()}", "name": "Tania Akter", "department": "Accounts", "phone": "01911000000"}
+    body = {"employee_id": seven(), "name": "Tania Akter", "department": "Accounts", "phone": "01911000000"}
     body.update(kw)
     return req(client, admin, "POST", "/passengers", json=body)
 
@@ -228,7 +259,7 @@ def do_import(client, admin, data, dry_run=False, name="staff.xlsx"):
 
 def test_import_adds_and_updates(client, db):
     admin = make_admin(db)
-    a, b = f"IMP-{uid()}", f"IMP-{uid()}"
+    a, b = seven(), seven()
     r = do_import(client, admin, xlsx([(a, "Alice One", "HR", "01711111111"), (b, "Bob Two", None, None)]))
     assert r.status_code == 200
     assert (r.json()["created"], r.json()["updated"], r.json()["skipped"]) == (2, 0, 0)
@@ -237,7 +268,7 @@ def test_import_adds_and_updates(client, db):
     assert db.scalar(select(Passenger.department).where(Passenger.employee_id == b)) is None
 
     # again: one changed, one the same, one new; a blank department keeps the old one
-    c = f"IMP-{uid()}"
+    c = seven()
     r = do_import(client, admin, xlsx([(a, "Alice Renamed", "Finance", None), (b, "Bob Two", "", ""), (c, "Carol", "IT", "")]))
     body = r.json()
     assert (body["created"], body["updated"], body["unchanged"]) == (1, 1, 1)
@@ -249,7 +280,7 @@ def test_import_adds_and_updates(client, db):
 
 def test_import_dry_run_changes_nothing(client, db):
     admin = make_admin(db)
-    a = f"IMP-{uid()}"
+    a = seven()
     r = do_import(client, admin, xlsx([(a, "Alice", "HR", None)]), dry_run=True)
     assert r.json()["dry_run"] is True and r.json()["created"] == 1
     assert db.scalar(select(Passenger).where(Passenger.employee_id == a)) is None
@@ -257,21 +288,21 @@ def test_import_dry_run_changes_nothing(client, db):
 
 def test_import_headings_in_any_order_and_numbers(client, db):
     admin = make_admin(db)
-    n = 880000 + int(uid(), 16) % 100000
+    n = 2_000_000 + int(uid(), 16) % 1_000_000
     data = xlsx([("Rina", float(n), "Sales", 1711223344)], headings=("full name", " Emp-ID ", "DEPT", "Mobile No"))
     r = do_import(client, admin, data)
     assert r.status_code == 200 and r.json()["created"] == 1, r.text
-    p = db.scalar(select(Passenger).where(Passenger.employee_id == str(n)))  # 880123.0 is stored as 880123
+    p = db.scalar(select(Passenger).where(Passenger.employee_id == str(n)))  # 2880123.0 is stored as 2880123
     assert p.name == "Rina" and p.department == "Sales" and p.phone == "1711223344"
 
 
 def test_import_skips_bad_rows_and_saves_the_rest(client, db):
     admin = make_admin(db)
-    a, d = f"IMP-{uid()}", f"IMP-{uid()}"
+    a, d = seven(), seven()
     r = do_import(client, admin, xlsx([
         (a, "Good", "HR", None),
         ("", "No ID", None, None),
-        (f"IMP-{uid()}", "", None, None),
+        (seven(), "", None, None),
         (a.lower(), "Duplicate in file", None, None),
         (None, None, None, None),            # empty line, ignored
         ("X" * 41, "Long id", None, None),

@@ -103,7 +103,7 @@ def _valid_id(employee_id: str) -> str:
     """The typed ID in capitals, if it has the agreed shape (letter case does not matter)."""
     value = employee_id.strip().upper()
     if not re.fullmatch(settings.passenger_id_pattern, value):
-        raise api_error(422, "BAD_ID_FORMAT", "This does not look like an employee ID", example="EMP2210")
+        raise api_error(422, "BAD_ID_FORMAT", "This does not look like an employee ID", example="1236001")
     return value
 
 

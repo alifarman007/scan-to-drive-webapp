@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
-import { PHONE_RE, cleanId, idLooksRight, type Employee } from "@/lib/passenger-api";
+import { ID_EXAMPLE, PHONE_RE, cleanId, idIsNumeric, idLooksRight, type Employee } from "@/lib/passenger-api";
 import { cn } from "@/lib/utils";
 
 import { ErrorText, Shake, useErrorText } from "./pieces";
@@ -133,7 +133,8 @@ export function EmployeeForm<T>({
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="next"
-              placeholder="EMP2210"
+              inputMode={idIsNumeric(idPattern) ? "numeric" : "text"}
+              placeholder={ID_EXAMPLE}
               value={id}
               onChange={(e) => {
                 setId(cleanId(e.target.value));

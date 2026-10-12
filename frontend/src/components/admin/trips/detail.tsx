@@ -3,6 +3,7 @@
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
+  HandshakeIcon,
   IdentificationBadgeIcon,
   InfoIcon,
   LockKeyIcon,
@@ -27,7 +28,7 @@ import { TripStatusChip } from "@/components/admin/trip-status";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/ui/reveal";
 import type { Alert, TripDetail } from "@/lib/admin-api";
-import { cn } from "@/lib/utils";
+import { cn, personInitials } from "@/lib/utils";
 
 import { useDuration } from "../dashboard/bits";
 import { TripActions, type Done } from "./actions";
@@ -69,6 +70,12 @@ export function TripDetailView({ data }: { data: TripDetail }) {
                 model: trip.vehicle.model,
                 reg: trip.vehicle.reg_number,
               })}
+              {trip.vehicle.vendor_name ? (
+                <span className="ml-2 inline-flex translate-y-[-1px] items-center gap-1 rounded-full bg-soft px-2 py-0.5 text-xs font-semibold text-title">
+                  <HandshakeIcon size={12} weight="fill" className="text-accent" />
+                  {trip.vehicle.vendor_name}
+                </span>
+              ) : null}
             </p>
           </div>
           {user.role === "admin" ? <TripActions trip={trip} onDone={afterAction} /> : null}
@@ -200,10 +207,6 @@ function Notices({ trip }: { trip: Trip }) {
   );
 }
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
-}
 
 function Person({
   icon,
@@ -228,7 +231,7 @@ function Person({
           tone === "wait" ? "bg-wait-bg text-wait-fg" : "bg-soft text-title",
         )}
       >
-        {name ? initials(name) : icon}
+        {name ? personInitials(name) : icon}
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-muted">

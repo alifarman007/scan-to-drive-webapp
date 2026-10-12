@@ -22,9 +22,9 @@ def _uid() -> str:
 
 
 def emp_id() -> str:
-    """A random employee ID in the agreed shape (3 letters + 4 digits), e.g. TQX4821."""
+    """A random employee ID in the Epic shape (7 digits), e.g. 1236421."""
     import random
-    return "T" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ", k=2)) + f"{random.randint(0, 9999):04d}"
+    return str(random.randint(1_000_000, 9_999_999))
 
 
 @pytest.fixture()
@@ -127,22 +127,23 @@ def test_cancelled_trip_qr_is_dead(client, db):
 
 def test_any_well_formed_id_is_accepted_and_added(client, db):
     _, _, trip_id, raw = new_trip(client, db)
-    r = client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "  emp7788 ", "name": "Rafiq Hasan"})
+    r = client.post(f"/api/p/{raw}/confirm-start", json={"passenger_type": "employee", "employee_id": "  1237788 ", "name": "Rafiq Hasan"})
     assert r.status_code == 200 and r.json()["trip"]["passenger_name"] == "Rafiq Hasan"
-    p = db.scalar(select(Passenger).where(Passenger.employee_id == "EMP7788"))
+    p = db.scalar(select(Passenger).where(Passenger.employee_id == "1237788"))
     assert p is not None and p.name == "Rafiq Hasan"
     assert db.get(Trip, trip_id).passenger_id == p.id
 
 
 def test_name_is_optional_and_the_id_is_shown_instead(client, db):
     _, _, _, raw = new_trip(client, db)
-    r = confirm_employee(client, raw, "Abc1234")
-    assert r.status_code == 200 and r.json()["trip"]["passenger_name"] == "ABC1234"
+    eid = emp_id()
+    r = confirm_employee(client, raw, eid)
+    assert r.status_code == 200 and r.json()["trip"]["passenger_name"] == eid
 
 
 def test_badly_formed_id_is_refused_but_not_counted(client, db):
     _, _, _, raw = new_trip(client, db)
-    for bad in ("EMP-2210", "EM2210", "EMP221", "2210EMP"):
+    for bad in ("EMP2210", "123456", "12345678", "123-4567", "123 4567"):
         r = confirm_employee(client, raw, bad)
         assert r.status_code == 422 and r.json()["detail"]["code"] == "BAD_ID_FORMAT"
     assert client.get(f"/api/p/{raw}").json()["tries_left"] == 5
