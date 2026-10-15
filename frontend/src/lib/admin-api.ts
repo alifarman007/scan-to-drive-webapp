@@ -18,6 +18,8 @@ export type BoardCar = {
   vehicle_status: "active" | "maintenance" | "inactive";
   owner: CarOwner;
   vendor_name: string | null;
+  /** latest trip start or end of this car, null if never used */
+  last_used_at: string | null;
   trip: null | { id: number; trip_no: string; status: TripStatus; driver_name: string; destination: string; start_time: string };
 };
 

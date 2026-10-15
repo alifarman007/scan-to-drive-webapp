@@ -97,12 +97,21 @@
     },
     "board": {
       "title": "Cars right now",
-      "hint": "{count, plural, one {# car} other {# cars}}, live",
+      "hint": "{count, plural, one {# car} other {# cars}} · latest four",
       "filter": "Show cars",
       "all": "All",
       "none": "No cars here right now.",
       "waitingStart": "start",
-      "waitingEnd": "end"
+      "waitingEnd": "end",
+      "seeAll": "See all {count} cars",
+      "seeAllOf": {
+        "on_trip": "See all cars on a trip",
+        "waiting": "See all cars waiting",
+        "available": "See all free cars",
+        "maintenance": "See all cars in maintenance"
+      },
+      "moreOnCars": "{count, plural, one {# more car} other {# more cars}}",
+      "allOnCars": "Search and filter on the Cars page"
     },
     "live": {
       "updated": "Live · {time}",
@@ -1080,8 +1089,8 @@
       "placeholder": "e.g. Lanka Bangla Enterprise"
     },
     "elsewhere": {
-      "epic": "{count, plural, one {# match} other {# matches}} in Epic cars",
-      "vendor": "{count, plural, one {# match} other {# matches}} in Vendor cars"
+      "epic": "{count} more in Epic cars",
+      "vendor": "{count} more in Vendor cars"
     },
     "kmUnknown": "Km not recorded yet",
     "kmUnknownHint": "The first trip's start km sets it."

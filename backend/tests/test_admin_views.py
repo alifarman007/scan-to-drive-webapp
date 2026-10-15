@@ -42,6 +42,8 @@ def test_car_board_shows_each_state(client, db):
     assert w["state"] == "waiting" and w["trip"]["driver_name"] == d1.name and w["trip"]["destination"]
     o = board_entry(body, on_trip_car)
     assert o["state"] == "on_trip" and o["current_km"] == 45000 and o["trip"]["status"] == "in_progress"
+    # when each car was last used: none yet for the idle car, the trip start for the busy ones
+    assert board_entry(body, available)["last_used_at"] is None and o["last_used_at"] and w["last_used_at"]
 
 
 def test_ended_trip_waiting_for_confirmation_shows_as_waiting(client, db):

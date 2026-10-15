@@ -1,7 +1,7 @@
 "use client";
 
 import { CaretDownIcon, CircleNotchIcon, EyeIcon, MagnifyingGlassIcon, SignOutIcon, UserCircleGearIcon } from "@phosphor-icons/react";
-import { motion } from "motion/react";
+import { motion, type Variants } from "motion/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import { Wordmark } from "@/components/brand";
 import { LanguageSwitch } from "@/components/ui/language-switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { adminApi, type AdminUser } from "@/lib/admin-api";
+import { useIntroPlaying } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 import { MobileDock } from "./mobile-dock";
@@ -37,27 +38,66 @@ export function AdminShell({ user, openAlerts, children }: { user: AdminUser; op
     <UserContext.Provider value={user}>
       <div className="min-h-dvh lg:grid lg:grid-cols-[18rem_minmax(0,1fr)]">
         {/* laptop: floating sidebar */}
-        <aside className="sticky top-0 hidden h-dvh p-3 pr-0 lg:block">
+        <IntroIn as="aside" from="left" className="sticky top-0 hidden h-dvh p-3 pr-0 lg:block">
           <Sidebar openAlerts={openAlerts} />
-        </aside>
+        </IntroIn>
 
         {/* phone: floating header */}
-        <div className="sticky top-0 z-30 px-3 pt-[max(0.6rem,env(safe-area-inset-top))] lg:hidden">
+        <IntroIn from="top" className="sticky top-0 z-30 px-3 pt-[max(0.6rem,env(safe-area-inset-top))] lg:hidden">
           <div className="flex h-14 items-center justify-between rounded-[1.25rem] bg-side/95 pr-1.5 pl-4 shadow-[0_12px_30px_-12px_rgb(15_26_61/0.55)] ring-1 ring-white/10 backdrop-blur-md">
             <Link href="/admin" className="rounded-lg">
               <Wordmark name={t("app.name")} />
             </Link>
             <UserMenu user={user} tone="onDark" />
           </div>
-        </div>
+        </IntroIn>
 
         <div className="flex min-w-0 flex-col">
-          <TopBar user={user} />
+          <IntroIn from="top" delay={0.12}>
+            <TopBar user={user} />
+          </IntroIn>
           <main className="flex-1 px-gutter pt-4 pb-[calc(7rem+env(safe-area-inset-bottom))] lg:pt-2 lg:pb-10">{children}</main>
         </div>
       </div>
       <MobileDock user={user} openAlerts={openAlerts} />
     </UserContext.Provider>
+  );
+}
+
+const OUT: Record<"left" | "top", Variants> = {
+  left: { away: { opacity: 0, x: -28, transition: { duration: 0 } }, here: { opacity: 1, x: 0 } },
+  top: { away: { opacity: 0, y: -14, transition: { duration: 0 } }, here: { opacity: 1, y: 0 } },
+};
+
+/**
+ * The frame glides in as the opening screen lifts (after signing in): sidebar from the left, bars from the top.
+ * On every other page change it simply stays put.
+ */
+function IntroIn({
+  as = "div",
+  from,
+  delay = 0,
+  className,
+  children,
+}: {
+  as?: "div" | "aside";
+  from: "left" | "top";
+  delay?: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const playing = useIntroPlaying();
+  const Tag = as === "aside" ? motion.aside : motion.div;
+  return (
+    <Tag
+      className={className}
+      variants={OUT[from]}
+      initial={false}
+      animate={playing ? "away" : "here"}
+      transition={{ duration: 0.8, delay, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </Tag>
   );
 }
 

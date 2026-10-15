@@ -176,7 +176,12 @@ export function CarsList({
   );
   // a search that finds nothing here may find cars in the other view: say so, one tap away
   const other: CarOwner = owner === "epic" ? "vendor" : "epic";
-  const elsewhere = needle ? cars.filter((c) => c.owner === other && matches(c)).length : 0;
+  const inFilter = (c: Car) => {
+    const s = carState(c);
+    return !filter || (filter === "on_trip" ? s === "on_trip" || s === "waiting" : s === filter);
+  };
+  // a search or state switch also counts the other view, so nothing hides there (e.g. a vendor car on a trip)
+  const elsewhere = needle || filter ? cars.filter((c) => c.owner === other && inFilter(c) && matches(c)).length : 0;
 
   const totalKm = cars.reduce((s, c) => s + c.total_km, 0);
 
@@ -244,7 +249,6 @@ export function CarsList({
           onClick={() => {
             setOwner(other);
             setVendor("");
-            setFilter("");
           }}
           className="-mt-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-soft px-3.5 py-1.5 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white"
         >

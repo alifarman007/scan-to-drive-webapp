@@ -853,8 +853,8 @@ Frontend:
 - [x] The phone shrinks the photo to 2048 px (JPEG 92 %) before sending, so it uploads fast on mobile data; the server does the rest.
 - [x] Trip page "Check the meter": red line "The same photo is on trip T-005077. Check it." (or "The start and end photos are the same
       picture. Check the km."), and the zoom shows the photo size (2048×1536 · 412 KB).
-- [x] App icon: the navy Epic logo on white (traced from `public/brand/epic-logo-navy.png` into a sharp vector, so it stays crisp at
-      every size), icon for iPhone home screen, and "Add to home screen" on Android opens the driver page as an app (`src/app/icon.svg`,
+- [x] App icon (navy square, scan frame and road; for a few days it was the Epic logo on white, then back to this one), icon for
+      iPhone home screen, and "Add to home screen" on Android opens the driver page as an app (`src/app/icon.svg`,
       `apple-icon.png`, `manifest.ts`, `public/icons/`).
 - [x] Wrong address (404): a road that ends at a barrier, a little car drives up and stops with hazard lights blinking; Start page / Driver
       page buttons, language and theme. Errors: the same picture with a broken road, "Try again" and an error code for the office.
@@ -944,6 +944,34 @@ Frontend:
 - [ ] To confirm with Epic: the drivers' real IDs and phone numbers, the Epic car models, whether the two "Md. Shariful Islam" (CAR-02
       and CAR-05) are two people (now two drivers, 1239002 and 1239005; turn one off if it is the same person), and "Md. ShaAlam" (kept
       as written in the list).
+
+### 2026-10-15 (dashboard: clickable numbers, latest four cars, entrance after sign-in; app icon back)
+
+Backend (no database change):
+- [x] Dashboard car board: `last_used_at` for each car (latest trip start or end), so the home page can show the most recent cars.
+- [x] 324 tests pass.
+
+Frontend:
+- [x] App icon is back to the first design (navy square, scan frame and road); the Epic logo version is dropped. Splash colour navy again.
+- [x] The six numbers at the top open the page behind them: cars on a trip and cars free go to the Cars page with that filter (the view
+      with most of those cars; the other view shows "1 more in Vendor cars" when some are there), waiting for a passenger and trips today
+      go to Trip history with that filter, km today to today's completed trips, open alerts to Alerts. Each card lifts on hover and has a
+      small arrow.
+- [x] Cars page: the "more in the other view" link now also works for the state filter (not only for a search), and keeps the filter.
+- [x] "Cars right now" shows only the latest four: cars on a trip first (latest start first), then idle cars used most recently;
+      cars in maintenance only under their own filter. Under them a "See all 24 cars" strip: the hidden cars as a small deck of
+      number plates that fans out on hover, a dashed road with a little car that drives along on hover, and on click the car speeds
+      off, the strip fills and the Cars page opens (with the same filter as the board).
+- [x] After signing in: the opening screen plays, the page waits under it, and as the curtain lifts the sidebar glides in from the
+      left, the top bar drops in, the greeting comes into focus word by word, the six numbers rise one after another (a soft light
+      passes over each, then they count up) and the panels float up. On phones the dock rises from the bottom. Other page changes
+      are not slowed down; "reduce motion" skips it.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox: the entrance timing measured in the browser (the page appears as the curtain lifts, everything settled
+      about 0.8 s later), every number card goes to the right page, See all opens the Cars page (also with the Available filter),
+      laptop and phone, light and dark. No sideways scrolling, no browser errors. Lint, types and build pass.
+- [ ] To verify on the laptop: sign out and sign in again to see the entrance; hover "See all" on the dashboard; reinstall the app
+      icon on a phone (remove the old home-screen icon first).
 
 ## Database (PDF section 16)
 

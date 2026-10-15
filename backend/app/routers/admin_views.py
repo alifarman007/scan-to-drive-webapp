@@ -136,6 +136,10 @@ def dashboard(_: AdminUser = Depends(current_admin_user), db: Session = Depends(
     ).all()
     by_vehicle = {t.vehicle_id: t for t in open_trips}
     vehicles = db.scalars(select(Vehicle).order_by(Vehicle.car_code)).all()
+    # when each car was last used (latest start or end), so the home page can show the most recent ones first
+    last_used = dict(db.execute(
+        select(Trip.vehicle_id, func.max(func.greatest(Trip.start_time, func.coalesce(Trip.end_time, Trip.start_time))))
+        .where(Trip.status != TripStatus.cancelled).group_by(Trip.vehicle_id)).all())
 
     board = []
     for v in vehicles:
@@ -152,6 +156,7 @@ def dashboard(_: AdminUser = Depends(current_admin_user), db: Session = Depends(
             "id": v.id, "car_code": v.car_code, "model": v.model, "reg_number": v.reg_number,
             "current_km": v.current_km, "state": state, "vehicle_status": v.status.value,
             "owner": v.owner.value, "vendor_name": v.vendor.name if v.vendor else None,
+            "last_used_at": last_used.get(v.id),
             "trip": None if t is None else {
                 "id": t.id, "trip_no": t.trip_no, "status": t.status.value, "driver_name": t.driver.name,
                 "destination": t.destination, "start_time": t.start_time,

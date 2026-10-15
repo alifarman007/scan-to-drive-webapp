@@ -7,8 +7,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useAdminUser } from "@/components/admin/admin-shell";
 import { LiveDot } from "@/components/ui/live-dot";
-import { Reveal } from "@/components/ui/reveal";
 import { adminApi, isSignedOut, toSignIn, type Dashboard as Data } from "@/lib/admin-api";
+import { useIntroPlaying } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 import { AlertsPanel } from "./alerts-panel";
@@ -26,8 +26,51 @@ function partOfDay(iso: string) {
   return hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
 }
 
-/** The transport office home: live numbers, every car, open trips, alerts and this month's charts. */
+/**
+ * The transport office home. Right after signing in the opening screen plays first; the page waits under it and
+ * makes its entrance as the curtain lifts (greeting, then the numbers one by one, then the panels).
+ */
 export function Dashboard({ initial }: { initial: Data }) {
+  const playing = useIntroPlaying();
+  if (playing) return <div aria-hidden="true" className="min-h-[70dvh]" />;
+  return <DashboardBody initial={initial} />;
+}
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** "Good evening, admin": the words drift in one after another, coming into focus. */
+function Greeting({ text, date }: { text: string; date: string }) {
+  const words = text.split(" ");
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <motion.p
+        className="text-sm font-semibold text-muted"
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: EASE }}
+      >
+        {date}
+      </motion.p>
+      <h1 className="font-display text-3xl font-bold text-title" aria-label={text}>
+        {words.map((w, i) => (
+          <motion.span
+            key={i}
+            aria-hidden="true"
+            className="inline-block whitespace-pre"
+            initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.7, delay: 0.08 + i * 0.09, ease: EASE }}
+          >
+            {i < words.length - 1 ? `${w} ` : w}
+          </motion.span>
+        ))}
+      </h1>
+    </div>
+  );
+}
+
+/** Live numbers, the latest cars, open trips, alerts and this month's charts. */
+function DashboardBody({ initial }: { initial: Data }) {
   const t = useTranslations("dashboard");
   const format = useFormatter();
   const user = useAdminUser();
@@ -66,16 +109,17 @@ export function Dashboard({ initial }: { initial: Data }) {
 
   return (
     <div className="flex flex-col gap-section">
-      <Reveal className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm font-semibold text-muted">
-            {format.dateTime(asOf, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          </p>
-          <h1 className="font-display text-3xl font-bold text-title">
-            {t(`greeting.${partOfDay(data.as_of)}`, { name: user.username })}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <Greeting
+          text={t(`greeting.${partOfDay(data.as_of)}`, { name: user.username })}
+          date={format.dateTime(asOf, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+        />
+        <motion.div
+          className="flex items-center gap-2"
+          initial={{ opacity: 0, x: 10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
+        >
           <AnimatePresence mode="wait" initial={false}>
             {offline ? (
               <motion.span
@@ -110,33 +154,47 @@ export function Dashboard({ initial }: { initial: Data }) {
           >
             <ArrowClockwiseIcon size={18} weight="bold" className={cn(loading && "animate-spin")} />
           </button>
-        </div>
-      </Reveal>
+        </motion.div>
+      </div>
 
-      <StatCards cards={data.cards} />
+      <StatCards cards={data.cards} board={data.car_board} />
 
       <div className="grid gap-section xl:grid-cols-[minmax(0,1fr)_23rem]">
-        <Reveal delay={0.1} className="min-w-0">
+        <Rise delay={0.42} className="min-w-0">
           <CarBoard cars={data.car_board} asOf={data.as_of} />
-        </Reveal>
-        <Reveal delay={0.16} className="flex min-w-0 flex-col gap-section">
+        </Rise>
+        <Rise delay={0.52} className="flex min-w-0 flex-col gap-section">
           <AlertsPanel alerts={data.alerts} total={data.cards.open_alerts} asOf={data.as_of} onChanged={() => void load()} />
           <RatingsPanel ratings={data.ratings} asOf={data.as_of} />
-        </Reveal>
+        </Rise>
       </div>
 
-      <Reveal delay={0.2}>
+      <Rise delay={0.62}>
         <LiveTrips trips={data.live_trips} asOf={data.as_of} />
-      </Reveal>
+      </Rise>
 
       <div className="grid gap-section lg:grid-cols-2">
-        <Reveal delay={0.24} className="min-w-0">
+        <Rise delay={0.7} className="min-w-0">
           <TripsPerDay rows={data.charts.trips_per_day_this_month} today={data.today} />
-        </Reveal>
-        <Reveal delay={0.28} className="min-w-0">
+        </Rise>
+        <Rise delay={0.76} className="min-w-0">
           <KmPerCar rows={data.charts.km_per_car_this_month} />
-        </Reveal>
+        </Rise>
       </div>
     </div>
+  );
+}
+
+/** A panel floating up into place, slow and soft. */
+function Rise({ delay, className, children }: { delay: number; className?: string; children: React.ReactNode }) {
+  return (
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 26 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.85, delay, ease: EASE }}
+    >
+      {children}
+    </motion.div>
   );
 }

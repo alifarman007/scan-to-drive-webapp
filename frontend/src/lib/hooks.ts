@@ -128,3 +128,19 @@ export function useScrollFade<T extends HTMLElement>() {
   const style: React.CSSProperties | undefined = mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined;
   return [ref, style] as const;
 }
+
+/* ---- the opening screen (components/preloader.tsx) ---- */
+
+function introPlaying() {
+  const c = document.documentElement.classList;
+  return c.contains("s2d-intro") && !c.contains("s2d-intro-reveal");
+}
+function subscribeIntro(onChange: () => void) {
+  const mo = new MutationObserver(onChange);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => mo.disconnect();
+}
+/** True while the opening screen still covers the page: an entrance animation should wait until it lifts. */
+export function useIntroPlaying() {
+  return useSyncExternalStore(subscribeIntro, introPlaying, () => false);
+}

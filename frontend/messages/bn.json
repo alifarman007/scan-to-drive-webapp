@@ -97,12 +97,21 @@
     },
     "board": {
       "title": "এই মুহূর্তে গাড়িগুলো",
-      "hint": "{count}টি গাড়ি, সরাসরি",
+      "hint": "{count}টি গাড়ি · সাম্প্রতিক চারটি",
       "filter": "গাড়ি দেখান",
       "all": "সব",
       "none": "এই মুহূর্তে এখানে কোনো গাড়ি নেই।",
       "waitingStart": "শুরু",
-      "waitingEnd": "শেষ"
+      "waitingEnd": "শেষ",
+      "seeAll": "সব {count}টি গাড়ি দেখুন",
+      "seeAllOf": {
+        "on_trip": "যাত্রায় থাকা সব গাড়ি দেখুন",
+        "waiting": "অপেক্ষায় থাকা সব গাড়ি দেখুন",
+        "available": "খালি সব গাড়ি দেখুন",
+        "maintenance": "মেরামতে থাকা সব গাড়ি দেখুন"
+      },
+      "moreOnCars": "আরও {count}টি গাড়ি",
+      "allOnCars": "গাড়ি পাতায় খুঁজুন ও বাছুন"
     },
     "live": {
       "updated": "সরাসরি · {time}",
@@ -1080,8 +1089,8 @@
       "placeholder": "যেমন Lanka Bangla Enterprise"
     },
     "elsewhere": {
-      "epic": "এপিকের গাড়িতে {count}টি মিল আছে",
-      "vendor": "ভেন্ডরের গাড়িতে {count}টি মিল আছে"
+      "epic": "এপিকের গাড়িতে আরও {count}টি",
+      "vendor": "ভেন্ডরের গাড়িতে আরও {count}টি"
     },
     "kmUnknown": "কিমি এখনও লেখা হয়নি",
     "kmUnknownHint": "প্রথম যাত্রার শুরুর কিমি থেকে এটি বসবে।"

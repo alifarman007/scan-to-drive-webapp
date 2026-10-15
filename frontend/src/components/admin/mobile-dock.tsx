@@ -22,6 +22,7 @@ import { LanguageSwitch } from "@/components/ui/language-switch";
 import { Sheet } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { AdminUser } from "@/lib/admin-api";
+import { useIntroPlaying } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
 import { FOOT_NAV, MAIN_NAV, isActive } from "./nav";
@@ -38,6 +39,7 @@ export function MobileDock({ user, openAlerts }: { user: AdminUser; openAlerts: 
   const pathname = usePathname();
   const [sheet, setSheet] = useState<"search" | "more" | null>(null);
   const hidden = useHideOnScroll();
+  const intro = useIntroPlaying(); // under the opening screen: rises once it lifts
 
   const moreKeys = [...MAIN_NAV, ...FOOT_NAV].filter((n) => !["dashboard", "trips", "alerts"].includes(n.key));
   const moreActive = moreKeys.some((n) => isActive(pathname, n.href));
@@ -56,8 +58,8 @@ export function MobileDock({ user, openAlerts }: { user: AdminUser; openAlerts: 
         aria-label={t("nav.main")}
         className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 lg:hidden"
         initial={false}
-        animate={{ y: hidden && !sheet ? "140%" : 0 }}
-        transition={{ type: "spring", stiffness: 420, damping: 38 }}
+        animate={{ y: (hidden && !sheet) || intro ? "140%" : 0 }}
+        transition={intro ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38 }}
       >
         <div className="mx-auto grid h-[4.25rem] max-w-md grid-cols-5 items-center rounded-[1.6rem] bg-side/92 px-1.5 shadow-[0_18px_40px_-12px_rgb(15_26_61/0.6),0_2px_8px_rgb(15_26_61/0.2)] ring-1 ring-white/10 backdrop-blur-xl">
           {items.map((item) => {
