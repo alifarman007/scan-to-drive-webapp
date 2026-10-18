@@ -13,9 +13,11 @@ import { MOTTO } from "@/lib/brand";
 const DECIDE = `(function(){try{var d=document.documentElement;
 if(location.pathname.indexOf('/p/')===0||sessionStorage.getItem('s2d.intro')){d.classList.add('s2d-no-intro');return;}
 sessionStorage.setItem('s2d.intro','1');d.classList.add('s2d-intro');
-var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-setTimeout(function(){d.classList.add('s2d-intro-reveal')},calm?1100:2200);
-setTimeout(function(){d.classList.add('s2d-intro-done')},2600);}catch(e){document.documentElement.classList.add('s2d-no-intro');}})();`;
+function reveal(){d.classList.add('s2d-intro-reveal')}function done(){reveal();d.classList.add('s2d-intro-done')}
+var out=/^s2d-(curtain|fade-out)$/;
+document.addEventListener('animationstart',function(e){if(out.test(e.animationName))setTimeout(reveal,180)});
+document.addEventListener('animationend',function(e){if(out.test(e.animationName))done()});
+setTimeout(reveal,4000);setTimeout(done,5000);}catch(e){document.documentElement.classList.add('s2d-no-intro');}})();`;
 
 /** The deciding script, for the page <head> (runs before the first paint). */
 export function PreloaderScript() {

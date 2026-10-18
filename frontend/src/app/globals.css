@@ -326,12 +326,8 @@
   animation-delay: calc(0.55s + var(--i) * 0.016s);
 }
 /* the page rises a little as the curtain lifts */
-.s2d-intro:not(.s2d-intro-done) body > * {
-  animation: s2d-page-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.85s both;
-}
-.s2d-intro:not(.s2d-intro-done) body > .s2d-preloader,
-.s2d-intro:not(.s2d-intro-done) body > script {
-  animation-name: none;
+.s2d-intro:not(.s2d-intro-done) body > :not(.s2d-preloader):not(script) {
+  animation: s2d-page-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 1.6s both;
 }
 @keyframes s2d-logo {
   from {
@@ -391,9 +387,9 @@
 }
 @keyframes s2d-curtain {
   to {
-    transform: translateY(-100%);
-    border-bottom-left-radius: 50% 6rem;
-    border-bottom-right-radius: 50% 6rem;
+    opacity: 0;
+    transform: translateY(-8%) scale(1.04);
+    visibility: hidden;
   }
 }
 @keyframes s2d-page-in {
@@ -413,9 +409,9 @@
     animation: none !important;
   }
   .s2d-intro .s2d-preloader {
-    animation: s2d-fade-out 0.4s ease 1s forwards !important;
+    animation: s2d-curtain 0.65s cubic-bezier(0.33, 0, 0.2, 1) 1.6s forwards;
   }
-  .s2d-intro:not(.s2d-intro-done) body > * {
+  .s2d-intro:not(.s2d-intro-done) body > :not(.s2d-preloader):not(script) {
     animation: none;
   }
   @keyframes s2d-fade-out {
