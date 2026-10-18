@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 import { AlertsPanel } from "./alerts-panel";
 import { CarBoard } from "./car-board";
-import { KmPerCar, TripsPerDay } from "./charts";
+import { ReportsGlimpse } from "./glimpse";
 import { LiveTrips } from "./live-trips";
 import { RatingsPanel } from "./ratings";
 import { StatCards } from "./stat-cards";
@@ -69,7 +69,7 @@ function Greeting({ text, date }: { text: string; date: string }) {
   );
 }
 
-/** Live numbers, the latest cars, open trips, alerts and this month's charts. */
+/** Live numbers, the latest cars, open trips, alerts and this month at a glance (from the reports). */
 function DashboardBody({ initial }: { initial: Data }) {
   const t = useTranslations("dashboard");
   const format = useFormatter();
@@ -173,14 +173,9 @@ function DashboardBody({ initial }: { initial: Data }) {
         <LiveTrips trips={data.live_trips} asOf={data.as_of} />
       </Rise>
 
-      <div className="grid gap-section lg:grid-cols-2">
-        <Rise delay={0.7} className="min-w-0">
-          <TripsPerDay rows={data.charts.trips_per_day_this_month} today={data.today} />
-        </Rise>
-        <Rise delay={0.76} className="min-w-0">
-          <KmPerCar rows={data.charts.km_per_car_this_month} />
-        </Rise>
-      </div>
+      <Rise delay={0.7} className="min-w-0">
+        <ReportsGlimpse charts={data.charts} today={data.today} />
+      </Rise>
     </div>
   );
 }

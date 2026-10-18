@@ -4,6 +4,7 @@ numbers go to the screen (JSON), to Excel and to PDF.
 Dates are Bangladesh dates and apply to the trip's start time (alerts: the time the alert was made).
 If no date is given the report covers the current month. Times in the rows are already written in
 Bangladesh time, ready to show."""
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
@@ -18,6 +19,11 @@ from app.models import (
 from app.services.timeutil import LOCAL_TZ, range_bounds, today_local
 
 DONE = (TripStatus.completed, TripStatus.closed_by_admin)  # trips whose km count
+
+
+def _slug(text: str) -> str:
+    """A stable key for a label ("Total km" -> "total_km"), so the screen can show it in Bangla."""
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
 
 @dataclass
@@ -53,9 +59,11 @@ class Report:
             "name": self.name, "title": self.title,
             "period": {"from": self.date_from.isoformat(), "to": self.date_to.isoformat()},
             "filters": self.filters,
-            "summary": [{"label": k, "value": v} for k, v in self.summary],
+            "summary": [{"key": _slug(k), "label": k, "value": v} for k, v in self.summary],
             "sections": [{
-                "title": s.title, "columns": [{"key": c.key, "label": c.label} for c in s.columns],
+                "title": s.title, "key": _slug(s.title) if s.title else None,
+                # main: shown by default on screen (the same columns that fit the PDF page)
+                "columns": [{"key": c.key, "label": c.label, "main": c.pdf} for c in s.columns],
                 "rows": s.rows,
             } for s in self.sections],
         }
@@ -164,7 +172,7 @@ def car_usage(db: Session, f: Filters) -> Report:
         minutes = sum(_minutes(t) or 0 for t in done)
         active_days = {t.start_time.astimezone(LOCAL_TZ).date() for t in ts}
         rows.append({
-            "car_code": v.car_code, "reg_number": v.reg_number, "model": v.model, "trips": len(ts), "km": km,
+            "car_id": v.id, "car_code": v.car_code, "reg_number": v.reg_number, "model": v.model, "trips": len(ts), "km": km,
             "hours_used": round(minutes / 60, 1), "days_used": len(active_days),
             "idle_days": max(days_in_period - len(active_days), 0),
             "km_per_trip": round(km / len(done), 1) if done else 0,
@@ -206,7 +214,7 @@ def driver_report(db: Session, f: Filters) -> Report:
         done = [t for t in real if t.status in DONE]
         mins = [m for m in (_minutes(t) for t in done) if m is not None]
         rows.append({
-            "employee_id": d.employee_id, "name": d.name, "trips": len(real),
+            "driver_ref": d.id, "employee_id": d.employee_id, "name": d.name, "trips": len(real),
             "km": sum(t.distance_km or 0 for t in done),
             "avg_trip_minutes": round(sum(mins) / len(mins)) if mins else 0,
             "cancelled": len(ts) - len(real), "alerts": per_driver_alerts.get(d.id, 0),
@@ -268,7 +276,7 @@ def trip_log(db: Session, f: Filters) -> Report:
     for t in _trips(db, f):
         name, emp, dept = _who(t)
         rows.append({
-            "trip_no": t.trip_no, "date": fmt_dt(t.start_time)[:10], "car_code": t.vehicle.car_code,
+            "trip_id": t.id, "trip_no": t.trip_no, "date": fmt_dt(t.start_time)[:10], "car_code": t.vehicle.car_code,
             "reg_number": t.vehicle.reg_number, "driver": t.driver.name, "driver_id": t.driver.employee_id,
             "passenger": name, "passenger_id": emp, "department": dept, "purpose": t.purpose or "",
             "start_place": t.start_place, "destination": t.destination, "end_place": t.end_place or "",
@@ -309,7 +317,7 @@ def exceptions(db: Session, f: Filters) -> Report:
     rows = []
     for t in _trips(db, f):
         name, _, _ = _who(t)
-        base = {"trip_no": t.trip_no, "car_code": t.vehicle.car_code, "driver": t.driver.name,
+        base = {"trip_id": t.id, "trip_no": t.trip_no, "car_code": t.vehicle.car_code, "driver": t.driver.name,
                 "sort": t.start_time, "time": fmt_dt(t.start_time)}
         if t.status == TripStatus.cancelled:
             rows.append({**base, "type": "Cancelled trip", "details": t.close_reason or "", "status": t.status.value})
@@ -339,7 +347,7 @@ def exceptions(db: Session, f: Filters) -> Report:
     for a, t, v in db.execute(stmt).unique():
         rows.append({
             "type": ALERT_LABELS.get(a.type, a.type.value), "time": fmt_dt(a.created_at), "sort": a.created_at,
-            "trip_no": t.trip_no if t else "", "car_code": v.car_code if v else "",
+            "trip_id": t.id if t else None, "trip_no": t.trip_no if t else "", "car_code": v.car_code if v else "",
             "driver": t.driver.name if t else "", "details": a.message,
             "status": "open" if a.status == AlertStatus.open else "solved",
         })
@@ -378,24 +386,24 @@ def km_continuity(db: Session, f: Filters) -> Report:
         if in_range:
             gap = result = None
             if prev is None:
-                result = "First record for this car"
+                result, code = "First record for this car", "first"
             elif prev.end_km is None:
-                result = "Previous trip has no end km"
+                result, code = "Previous trip has no end km", "no_previous_end"
             else:
                 gap = t.start_km - prev.end_km
                 if gap == 0:
-                    result = "OK"
+                    result, code = "OK", "ok"
                 elif gap > 0:
-                    result = f"Unrecorded use: {gap} km"
+                    result, code = f"Unrecorded use: {gap} km", "unrecorded"
                 else:
-                    result = f"Odometer went back by {-gap} km"
+                    result, code = f"Odometer went back by {-gap} km", "went_back"
             if gap:
                 problems += 1
             rows.append({
-                "car_code": t.vehicle.car_code, "trip_no": t.trip_no, "start_time": fmt_dt(t.start_time),
+                "trip_id": t.id, "car_code": t.vehicle.car_code, "trip_no": t.trip_no, "start_time": fmt_dt(t.start_time),
                 "driver": t.driver.name, "previous_trip_no": prev.trip_no if prev else "",
                 "previous_end_km": prev.end_km if prev else None, "start_km": t.start_km, "gap_km": gap,
-                "result": result,
+                "result": result, "result_code": code,
             })
         prev = t
     r.summary = [("Trips checked", len(rows)), ("Trips with a gap", problems)]

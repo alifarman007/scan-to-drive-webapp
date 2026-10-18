@@ -1019,6 +1019,45 @@ Frontend:
       a test" and "Cannot import" groups, import. Export again later for the trips still running in the old form: rows already
       imported are skipped.
 
+### 2026-10-18 (reports page, dashboard "this month at a glance", shorter opening screen)
+
+The reports were ready in the backend since 9 Oct (seven reports, Excel and PDF) but the page was hidden. Now the page is built
+and in the menu. On the dashboard the two charts at the bottom (trips per day, km per car with all 24 cars, most at 0 km) are
+replaced by one small card taken from the reports. After signing in the dashboard came in under the opening screen, so its
+entrance was not seen: the opening screen is shorter now and the dashboard starts when the curtain has lifted.
+
+Backend (no database change):
+- [x] Report JSON: every summary number and table title has a `key` ("Total km" -> `total_km`) so the page can show it in
+      Bangla; every column has `main` (true for the columns that fit the PDF page; the others show with "All columns").
+- [x] Rows carry ids for links on the page: `car_id` (car usage), `driver_ref` (drivers), `trip_id` (trip log, exceptions, km
+      continuity). Km continuity rows have `result_code` (`ok`, `unrecorded`, `went_back`, `first`, `no_previous_end`).
+      Excel and PDF only use the columns, so the files are the same as before.
+- [x] 336 tests pass (1 new in `tests/test_reports.py`).
+
+Frontend:
+- [x] **/admin/reports** (admin and viewer), back in the sidebar and the phone menu (`HIDDEN_NAV` now: passengers, audit, overtime).
+  - seven report tiles: Monthly summary, Car usage, Drivers, Passengers & departments, Exceptions, Km continuity, Trip log;
+  - dates: Today, This week, This month (default), Last month, Pick dates; filters: car, driver, department;
+  - everything is in the address (`/admin/reports?r=car_usage&range=week&car=3`), so a report can be bookmarked or sent;
+  - headline numbers counting up; "... now" numbers in the monthly summary have a live dot (they are this moment, not the period);
+  - a picture per report: busiest cars and top departments (monthly summary), km by car and km by driver (tap a bar to see only
+    that car or driver), department share bar, km continuity bar with "23 matched · 3 unrecorded uses · 1 went back";
+  - tables: search, sort by any column, main or all columns, 50 rows at a time; trip numbers open the trip, car codes the car,
+    driver names the driver; statuses and km continuity results as coloured chips; gaps in amber, odometer going back in red;
+  - Excel and PDF buttons download exactly what is on screen (button shows a spinner, then a tick; "too many rows" said in words);
+  - "Nothing in this period" when there are no trips.
+- [x] Dashboard: "This month at a glance" card instead of the two charts: trips, km driven and cars used this month, a line of
+      trips per day (hover a day to read it, today is the bright dot), the 3 busiest cars, "Open reports" and four quick links
+      (monthly summary, car usage, drivers, exceptions). `charts.tsx` removed, new `glimpse.tsx`.
+- [x] Opening screen about 2.4 s instead of 3.3 s (logo, line and motto faster, curtain lifts at 1.7 s). The page is told to start
+      its entrance at 2.2 s (was 2.65 s, while the curtain still covered most of it). Measured after sign-in in the sandbox: greeting
+      and numbers come in between 2.3 and 2.9 s, the glance card by 3.4 s, all after the curtain is gone.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox: all seven reports, Excel and PDF downloads, tap a bar to narrow, last month (empty), trip log with all
+      columns, sort and search; light, dark, phone (no sideways scroll) and Bangla. No browser errors. Lint, types and build pass.
+- [ ] To verify on the laptop: sign out and in again (the opening screen plays once per tab), watch the dashboard come in; open
+      Reports, try each report and both downloads.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -1310,10 +1349,12 @@ frontend/                  Next.js app
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
   src/components/admin/office/ users page (users.tsx), settings page (settings.tsx), import old trips (import-old.tsx, page /admin/import)
   src/components/admin/fleet/ cars, drivers and alerts pages (cars.tsx, drivers.tsx, alerts.tsx) and their shared pieces (shared.tsx)
-  src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, two charts
+  src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, this month at a glance (glimpse.tsx)
   src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail
   src/components/admin/trips/ history list and filter bar, detail page, meter check with photo zoom, timeline, admin action dialogs
   src/lib/trip-filters.ts  reads and writes the trip history filters in the address
+  src/lib/report-filters.ts the same for the reports page (report, dates, car, driver, department)
+  src/components/admin/reports/ reports page: tiles, filters, downloads (reports.tsx), numbers, pictures and tables (report-view.tsx)
   src/lib/admin-api.ts     types and calls for the admin pages, back to sign-in when the session ends
   src/components/passenger/ passenger frame, start flow (employee / visitor), end flow, shared pieces (trip card, code timer, photo viewer, notices)
   src/components/passenger/review.tsx "How was your ride?" stars, tags, comment
@@ -1335,7 +1376,7 @@ Phase 1 (steps 1 to 9) is done, and the real fleet is in.
    HTTPS, and commit. Then `python -m app.load_fleet --apply` and print the stickers.
 2. Docker and Azure: containers for the backend, frontend and worker, Azure Blob Storage for photos, production settings
    (forwarded IP headers, secure cookies, real certificate).
-3. Later, when wanted: Reports, Passengers, Audit log and Driver overtime pages (hidden in the menus now).
+3. Later, when wanted: Passengers, Audit log and Driver overtime pages (hidden in the menus now).
 4. Reading the km from the dashboard photo (OCR): every photo is already stored the same way for it (`app/services/photos.py`).
 5. Backend still open: a Bangla font for PDF reports.
 6. From Epic: the drivers' real IDs and phones, the Epic car models, the employee list (Excel import), the Shariful Islam question

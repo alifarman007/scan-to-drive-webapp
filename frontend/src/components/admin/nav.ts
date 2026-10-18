@@ -31,10 +31,10 @@ const ALL_MAIN: NavItem[] = [
 
 /**
  * Pages left out of the menus for now (sidebar, phone dock, "More"). Passengers: there is no staff list yet,
- * passengers just type their ID. Reports, audit log and driver overtime come later. Take a key out of this
- * list to show the page again.
+ * passengers just type their ID. Audit log and driver overtime come later. Take a key out of this list to show
+ * the page again.
  */
-export const HIDDEN_NAV = new Set<NavKey>(["passengers", "reports", "audit", "overtime"]);
+export const HIDDEN_NAV = new Set<NavKey>(["passengers", "audit", "overtime"]);
 
 export const MAIN_NAV: NavItem[] = ALL_MAIN.filter((n) => !HIDDEN_NAV.has(n.key));
 

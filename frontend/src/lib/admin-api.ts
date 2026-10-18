@@ -191,6 +191,19 @@ export type Dashboard = {
   };
 };
 
+/** One report from GET /admin/reports/{name}: a few headline numbers and one or more tables. */
+export type ReportCell = string | number | null;
+export type ReportColumn = { key: string; label: string; /** shown on screen without "All columns" */ main: boolean };
+export type ReportSection = { title: string | null; key: string | null; columns: ReportColumn[]; rows: Record<string, ReportCell>[] };
+export type ReportData = {
+  name: string;
+  title: string;
+  period: { from: string; to: string };
+  filters: Record<string, string>;
+  summary: { key: string; label: string; value: number | string }[];
+  sections: ReportSection[];
+};
+
 /** A row of the trip history (same fields as a live trip, plus the end). */
 export type HistoryTrip = LiveTrip & {
   end_km: number | null;

@@ -153,16 +153,6 @@
       "solveFailed": "Could not save. Try again.",
       "markSolved": "Mark as solved"
     },
-    "charts": {
-      "kmTitle": "Km per car this month",
-      "kmHint": "{km} km in total",
-      "noKm": "No finished trips this month yet.",
-      "tripsTitle": "Trips per day this month",
-      "tripsHint": "{count, plural, one {# trip} other {# trips}} so far",
-      "noTrips": "No trips this month yet.",
-      "tripsCount": "{count, plural, one {# trip} other {# trips}}",
-      "today": "Today"
-    },
     "ratings": {
       "title": "Passenger ratings",
       "hint": "This month",
@@ -173,7 +163,21 @@
       "emptyBody": "Passengers can rate a trip right after they confirm the end."
     },
     "vendorCar": "Vendor car · {vendor}",
-    "kmUnknown": "No km yet"
+    "kmUnknown": "No km yet",
+    "glimpse": {
+      "title": "This month at a glance",
+      "hint": "{month}, from the reports",
+      "open": "Open reports",
+      "trips": "Trips",
+      "km": "Km driven",
+      "carsUsed": "Cars used",
+      "perDay": "Trips per day",
+      "today": "Today",
+      "tripsCount": "{count, plural, one {# trip} other {# trips}}",
+      "busiest": "Busiest cars",
+      "noKm": "No finished trips this month yet.",
+      "quick": "Jump to a report"
+    }
   },
   "styleguide": {
     "title": "Style guide",
@@ -1475,6 +1479,192 @@
     "errors": {
       "network": "No connection. Try again.",
       "generic": "Something went wrong. Try again."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "period": "{from} – {to}",
+    "pick": "Choose a report",
+    "km": "km",
+    "narrowedTo": "Showing only:",
+    "names": {
+      "monthly_summary": {
+        "title": "Monthly summary",
+        "hint": "The month on one page"
+      },
+      "car_usage": {
+        "title": "Car usage",
+        "hint": "Trips, km and idle days per car"
+      },
+      "drivers": {
+        "title": "Drivers",
+        "hint": "Trips, km and alerts per driver"
+      },
+      "passenger_department": {
+        "title": "Passengers & departments",
+        "hint": "Who rode, by department"
+      },
+      "exceptions": {
+        "title": "Exceptions",
+        "hint": "Cancelled, no passenger, alerts"
+      },
+      "km_continuity": {
+        "title": "Km continuity",
+        "hint": "Unrecorded km between trips"
+      },
+      "trip_log": {
+        "title": "Trip log",
+        "hint": "Every trip, every detail"
+      }
+    },
+    "range": {
+      "label": "Dates",
+      "today": "Today",
+      "week": "This week",
+      "month": "This month",
+      "last_month": "Last month",
+      "custom": "Pick dates",
+      "from": "From date",
+      "to": "To date"
+    },
+    "filter": {
+      "car": "Car",
+      "allCars": "All cars",
+      "carGroup": {
+        "epic": "Epic cars",
+        "vendor": "Vendor cars"
+      },
+      "driver": "Driver",
+      "allDrivers": "All drivers",
+      "department": "Department",
+      "allDepartments": "All departments",
+      "clear": "Clear filters"
+    },
+    "download": {
+      "xlsx": "Excel",
+      "pdf": "PDF",
+      "aria": "Download this report as {kind}",
+      "failed": "Could not make the file. Check the connection and try again.",
+      "tooMany": "Too many rows for one file. Choose fewer days."
+    },
+    "chart": {
+      "kmByCar": "Km by car",
+      "kmByDriver": "Km by driver",
+      "deptShare": "Share of km by department",
+      "tapToNarrow": "Tap a bar to see only that one",
+      "trips": "{count, plural, one {# trip} other {# trips}}",
+      "more": "and {count} more in the table below",
+      "others": "Others",
+      "noKm": "No finished trips in this period."
+    },
+    "result": {
+      "ok": "OK",
+      "unrecorded": "Unrecorded use: {km} km",
+      "went_back": "Odometer went back by {km} km",
+      "first": "First record for this car",
+      "no_previous_end": "Previous trip has no end km",
+      "okCount": "{count} matched",
+      "unrecordedCount": "{count, plural, one {# unrecorded use} other {# unrecorded uses}}",
+      "went_backCount": "{count} went back",
+      "firstCount": "{count, plural, one {# first record} other {# first records}}",
+      "no_previous_endCount": "{count} without previous end km"
+    },
+    "table": {
+      "details": "Details",
+      "rows": "{count, plural, one {# row} other {# rows}}",
+      "search": "Search in this table",
+      "clearSearch": "Clear search",
+      "allColumns": "All columns (+{count})",
+      "mainColumns": "Main columns",
+      "noMatch": "Nothing matches “{q}”.",
+      "empty": "Nothing to show.",
+      "showMore": "Show {count} more ({left} left)",
+      "open": "Open"
+    },
+    "empty": {
+      "title": "Nothing in this period",
+      "body": "No trips match these dates and filters. Try a longer period, or clear the filters."
+    },
+    "label": {
+      "car": "Car",
+      "reg_number": "Reg. number",
+      "model": "Model",
+      "trips": "Trips",
+      "total_km": "Total km",
+      "hours_used": "Hours used",
+      "days_used": "Days used",
+      "idle_days": "Idle days",
+      "km_per_trip": "Km per trip",
+      "employee_id": "Employee ID",
+      "driver": "Driver",
+      "average_trip_min": "Average trip (min)",
+      "cancelled_trips": "Cancelled trips",
+      "alerts": "Alerts",
+      "department": "Department",
+      "share_of_km": "Share of km (%)",
+      "passenger": "Passenger",
+      "trip": "Trip",
+      "date": "Date",
+      "driver_id": "Driver ID",
+      "passenger_id": "Passenger ID",
+      "purpose": "Purpose",
+      "from": "From",
+      "destination": "Destination",
+      "ended_at": "Ended at",
+      "start_km": "Start km",
+      "end_km": "End km",
+      "km": "Km",
+      "start_time": "Start time",
+      "end_time": "End time",
+      "minutes": "Minutes",
+      "status": "Status",
+      "review": "Review",
+      "approval": "Approval",
+      "note": "Note",
+      "photos_and_details_admin_page": "Photos and details",
+      "type": "Type",
+      "time": "Time",
+      "details": "Details",
+      "previous_trip": "Previous trip",
+      "previous_end_km": "Previous end km",
+      "gap_km": "Gap km",
+      "result": "Result",
+      "cars": "Cars",
+      "drivers": "Drivers",
+      "departments": "Departments",
+      "exceptions": "Exceptions",
+      "trips_checked": "Trips checked",
+      "trips_with_a_gap": "Trips with a gap",
+      "trips_not_cancelled": "Trips (not cancelled)",
+      "completed": "Completed",
+      "closed_by_admin": "Closed by office",
+      "cancelled": "Cancelled",
+      "average_km_per_trip": "Average km per trip",
+      "trips_without_a_passenger": "Trips without a passenger",
+      "visitor_trips": "Visitor trips",
+      "open_alerts_now": "Open alerts now",
+      "trips_waiting_for_admin_approval_now": "Waiting for approval now",
+      "trips_running_now": "Trips running now",
+      "by_department": "By department",
+      "by_passenger": "By passenger",
+      "busiest_cars": "Busiest cars",
+      "top_departments": "Top departments",
+      "cancelled_trip": "Cancelled trip",
+      "needs_review_passenger_could_not_scan": "Needs review (passenger could not scan)",
+      "no_passenger": "No passenger",
+      "km_gap": "Km gap",
+      "long_trip": "Long trip",
+      "high_km": "High km",
+      "wrong_ids_qr_blocked": "Wrong IDs (QR blocked)",
+      "waiting_too_long": "Waiting too long",
+      "visitor": "Visitor",
+      "no_department": "No department",
+      "yes": "Yes",
+      "open": "Open",
+      "solved": "Solved",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
     }
   }
 }

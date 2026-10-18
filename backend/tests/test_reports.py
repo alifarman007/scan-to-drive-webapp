@@ -306,3 +306,32 @@ def test_purposes_list(client, db):
     assert too_long.status_code == 422 and too_long.json()["detail"]["code"] == "BAD_PURPOSE"
     blank = client.put("/api/admin/settings/purposes", headers=hdr(admin), json={"purposes": ["  "]})
     assert blank.status_code == 422
+
+
+# ---- what the Reports page needs (keys for Bangla, main columns, links) -----------------------------
+
+def test_report_json_keys_for_the_page(client, db):
+    admin = make_admin(db)
+    car, driver = make_car(db), make_driver(db)
+    t1 = add_trip(db, car, driver, day=0, start_km=1000, end_km=1050)
+    t2 = add_trip(db, car, driver, day=1, start_km=1060, end_km=1100)
+    db.commit()
+
+    body = report(client, admin, "car_usage", car_id=car.id, **WINDOW).json()
+    assert {"key": "total_km", "label": "Total km", "value": 90} in body["summary"]
+    assert rows_of(body)[0]["car_id"] == car.id
+
+    body = report(client, admin, "trip_log", car_id=car.id, **WINDOW).json()
+    cols = {c["key"]: c["main"] for c in body["sections"][0]["columns"]}
+    assert cols["trip_no"] is True and cols["purpose"] is False  # purpose: Excel only, "All columns" on screen
+    assert [r["trip_id"] for r in rows_of(body)] == [t1.id, t2.id]
+    assert "trip_id" not in cols  # never a column in the files
+
+    body = report(client, admin, "km_continuity", car_id=car.id, **WINDOW).json()
+    assert [r["result_code"] for r in rows_of(body)] == ["first", "unrecorded"]
+
+    body = report(client, admin, "passenger_department", **WINDOW).json()
+    assert [s["key"] for s in body["sections"]] == ["by_department", "by_passenger"]
+
+    body = report(client, admin, "drivers", driver_id=driver.id, **WINDOW).json()
+    assert rows_of(body)[0]["driver_ref"] == driver.id

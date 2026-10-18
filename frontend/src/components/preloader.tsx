@@ -1,6 +1,6 @@
 /**
  * The opening moment: the Epic logo comes in, a line draws under it, the motto rises word by word, and the
- * navy curtain lifts to show the page (about 3 seconds). Plain HTML and CSS, so it plays straight away,
+ * navy curtain lifts to show the page (about 2.4 seconds). Plain HTML and CSS, so it plays straight away,
  * even before the app's JavaScript has loaded.
  *
  * Shown once per browser tab (a reload in the same tab skips it), never on the passenger pages (/p/...),
@@ -14,8 +14,8 @@ const DECIDE = `(function(){try{var d=document.documentElement;
 if(location.pathname.indexOf('/p/')===0||sessionStorage.getItem('s2d.intro')){d.classList.add('s2d-no-intro');return;}
 sessionStorage.setItem('s2d.intro','1');d.classList.add('s2d-intro');
 var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-setTimeout(function(){d.classList.add('s2d-intro-reveal')},calm?1500:2650);
-setTimeout(function(){d.classList.add('s2d-intro-done')},3600);}catch(e){document.documentElement.classList.add('s2d-no-intro');}})();`;
+setTimeout(function(){d.classList.add('s2d-intro-reveal')},calm?1100:2200);
+setTimeout(function(){d.classList.add('s2d-intro-done')},2600);}catch(e){document.documentElement.classList.add('s2d-no-intro');}})();`;
 
 /** The deciding script, for the page <head> (runs before the first paint). */
 export function PreloaderScript() {

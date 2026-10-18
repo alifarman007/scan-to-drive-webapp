@@ -153,16 +153,6 @@
       "solveFailed": "সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।",
       "markSolved": "সমাধান হয়েছে"
     },
-    "charts": {
-      "kmTitle": "এই মাসে গাড়িপ্রতি কিমি",
-      "kmHint": "মোট {km} কিমি",
-      "noKm": "এই মাসে এখনও কোনো যাত্রা শেষ হয়নি।",
-      "tripsTitle": "এই মাসে দিনপ্রতি যাত্রা",
-      "tripsHint": "এ পর্যন্ত {count}টি যাত্রা",
-      "noTrips": "এই মাসে এখনও কোনো যাত্রা নেই।",
-      "tripsCount": "{count}টি যাত্রা",
-      "today": "আজ"
-    },
     "ratings": {
       "title": "যাত্রীদের রেটিং",
       "hint": "এই মাস",
@@ -173,7 +163,21 @@
       "emptyBody": "যাত্রার শেষ নিশ্চিত করার পরপরই যাত্রী রেটিং দিতে পারেন।"
     },
     "vendorCar": "ভেন্ডরের গাড়ি · {vendor}",
-    "kmUnknown": "এখনও কিমি নেই"
+    "kmUnknown": "এখনও কিমি নেই",
+    "glimpse": {
+      "title": "এক নজরে এই মাস",
+      "hint": "{month}, রিপোর্ট থেকে",
+      "open": "রিপোর্ট খুলুন",
+      "trips": "ট্রিপ",
+      "km": "চলেছে (কিমি)",
+      "carsUsed": "ব্যবহৃত গাড়ি",
+      "perDay": "দিনে ট্রিপ",
+      "today": "আজ",
+      "tripsCount": "{count}টি ট্রিপ",
+      "busiest": "সবচেয়ে ব্যস্ত গাড়ি",
+      "noKm": "এই মাসে এখনও কোনো শেষ হওয়া ট্রিপ নেই।",
+      "quick": "সরাসরি রিপোর্টে যান"
+    }
   },
   "styleguide": {
     "title": "স্টাইল গাইড",
@@ -1475,6 +1479,192 @@
     "errors": {
       "network": "সংযোগ নেই। আবার চেষ্টা করুন।",
       "generic": "কিছু একটা সমস্যা হয়েছে। আবার চেষ্টা করুন।"
+    }
+  },
+  "reports": {
+    "title": "রিপোর্ট",
+    "period": "{from} – {to}",
+    "pick": "একটি রিপোর্ট বেছে নিন",
+    "km": "কিমি",
+    "narrowedTo": "শুধু দেখানো হচ্ছে:",
+    "names": {
+      "monthly_summary": {
+        "title": "মাসিক সারসংক্ষেপ",
+        "hint": "পুরো মাস এক পাতায়"
+      },
+      "car_usage": {
+        "title": "গাড়ির ব্যবহার",
+        "hint": "প্রতি গাড়ির ট্রিপ, কিমি, অলস দিন"
+      },
+      "drivers": {
+        "title": "ড্রাইভার",
+        "hint": "প্রতি ড্রাইভারের ট্রিপ, কিমি, সতর্কতা"
+      },
+      "passenger_department": {
+        "title": "যাত্রী ও বিভাগ",
+        "hint": "কে চড়েছেন, বিভাগ অনুযায়ী"
+      },
+      "exceptions": {
+        "title": "ব্যতিক্রম",
+        "hint": "বাতিল, যাত্রী ছাড়া, সতর্কতা"
+      },
+      "km_continuity": {
+        "title": "কিমি ধারাবাহিকতা",
+        "hint": "ট্রিপের মাঝে রেকর্ড ছাড়া কিমি"
+      },
+      "trip_log": {
+        "title": "ট্রিপ লগ",
+        "hint": "প্রতিটি ট্রিপ, সব তথ্য"
+      }
+    },
+    "range": {
+      "label": "তারিখ",
+      "today": "আজ",
+      "week": "এই সপ্তাহ",
+      "month": "এই মাস",
+      "last_month": "গত মাস",
+      "custom": "তারিখ বাছুন",
+      "from": "শুরুর তারিখ",
+      "to": "শেষ তারিখ"
+    },
+    "filter": {
+      "car": "গাড়ি",
+      "allCars": "সব গাড়ি",
+      "carGroup": {
+        "epic": "এপিকের গাড়ি",
+        "vendor": "ভেন্ডরের গাড়ি"
+      },
+      "driver": "ড্রাইভার",
+      "allDrivers": "সব ড্রাইভার",
+      "department": "বিভাগ",
+      "allDepartments": "সব বিভাগ",
+      "clear": "ফিল্টার মুছুন"
+    },
+    "download": {
+      "xlsx": "Excel",
+      "pdf": "PDF",
+      "aria": "এই রিপোর্ট {kind} হিসেবে ডাউনলোড করুন",
+      "failed": "ফাইল তৈরি করা গেল না। সংযোগ দেখে আবার চেষ্টা করুন।",
+      "tooMany": "এক ফাইলের জন্য সারি বেশি। কম দিন বেছে নিন।"
+    },
+    "chart": {
+      "kmByCar": "গাড়ি অনুযায়ী কিমি",
+      "kmByDriver": "ড্রাইভার অনুযায়ী কিমি",
+      "deptShare": "বিভাগ অনুযায়ী কিমির ভাগ",
+      "tapToNarrow": "শুধু সেটি দেখতে একটি বারে চাপুন",
+      "trips": "{count}টি ট্রিপ",
+      "more": "আরও {count}টি নিচের টেবিলে",
+      "others": "অন্যান্য",
+      "noKm": "এই সময়ে কোনো শেষ হওয়া ট্রিপ নেই।"
+    },
+    "result": {
+      "ok": "ঠিক আছে",
+      "unrecorded": "রেকর্ড ছাড়া ব্যবহার: {km} কিমি",
+      "went_back": "মিটার {km} কিমি পিছিয়েছে",
+      "first": "এই গাড়ির প্রথম রেকর্ড",
+      "no_previous_end": "আগের ট্রিপে শেষ কিমি নেই",
+      "okCount": "{count}টি মিলেছে",
+      "unrecordedCount": "{count}টি রেকর্ড ছাড়া ব্যবহার",
+      "went_backCount": "{count}টি পিছিয়েছে",
+      "firstCount": "{count}টি প্রথম রেকর্ড",
+      "no_previous_endCount": "{count}টিতে আগের শেষ কিমি নেই"
+    },
+    "table": {
+      "details": "বিস্তারিত",
+      "rows": "{count}টি সারি",
+      "search": "এই টেবিলে খুঁজুন",
+      "clearSearch": "খোঁজা মুছুন",
+      "allColumns": "সব কলাম (+{count})",
+      "mainColumns": "মূল কলাম",
+      "noMatch": "“{q}” এর সাথে কিছু মেলেনি।",
+      "empty": "দেখানোর কিছু নেই।",
+      "showMore": "আরও {count}টি দেখুন ({left}টি বাকি)",
+      "open": "খুলুন"
+    },
+    "empty": {
+      "title": "এই সময়ে কিছু নেই",
+      "body": "এই তারিখ ও ফিল্টারে কোনো ট্রিপ নেই। আরও লম্বা সময় বাছুন, অথবা ফিল্টার মুছুন।"
+    },
+    "label": {
+      "car": "গাড়ি",
+      "reg_number": "রেজি. নম্বর",
+      "model": "মডেল",
+      "trips": "ট্রিপ",
+      "total_km": "মোট কিমি",
+      "hours_used": "ব্যবহৃত ঘণ্টা",
+      "days_used": "ব্যবহৃত দিন",
+      "idle_days": "অলস দিন",
+      "km_per_trip": "প্রতি ট্রিপে কিমি",
+      "employee_id": "কর্মী আইডি",
+      "driver": "ড্রাইভার",
+      "average_trip_min": "গড় ট্রিপ (মিনিট)",
+      "cancelled_trips": "বাতিল ট্রিপ",
+      "alerts": "সতর্কতা",
+      "department": "বিভাগ",
+      "share_of_km": "কিমির ভাগ (%)",
+      "passenger": "যাত্রী",
+      "trip": "ট্রিপ",
+      "date": "তারিখ",
+      "driver_id": "ড্রাইভার আইডি",
+      "passenger_id": "যাত্রী আইডি",
+      "purpose": "উদ্দেশ্য",
+      "from": "যেখান থেকে",
+      "destination": "গন্তব্য",
+      "ended_at": "যেখানে শেষ",
+      "start_km": "শুরুর কিমি",
+      "end_km": "শেষ কিমি",
+      "km": "কিমি",
+      "start_time": "শুরুর সময়",
+      "end_time": "শেষের সময়",
+      "minutes": "মিনিট",
+      "status": "অবস্থা",
+      "review": "যাচাই",
+      "approval": "অনুমোদন",
+      "note": "নোট",
+      "photos_and_details_admin_page": "ছবি ও বিস্তারিত",
+      "type": "ধরন",
+      "time": "সময়",
+      "details": "বিস্তারিত",
+      "previous_trip": "আগের ট্রিপ",
+      "previous_end_km": "আগের শেষ কিমি",
+      "gap_km": "ফাঁক কিমি",
+      "result": "ফলাফল",
+      "cars": "গাড়ি",
+      "drivers": "ড্রাইভার",
+      "departments": "বিভাগ",
+      "exceptions": "ব্যতিক্রম",
+      "trips_checked": "যাচাই করা ট্রিপ",
+      "trips_with_a_gap": "ফাঁকসহ ট্রিপ",
+      "trips_not_cancelled": "ট্রিপ (বাতিল ছাড়া)",
+      "completed": "সম্পন্ন",
+      "closed_by_admin": "অফিস বন্ধ করেছে",
+      "cancelled": "বাতিল",
+      "average_km_per_trip": "ট্রিপ প্রতি গড় কিমি",
+      "trips_without_a_passenger": "যাত্রী ছাড়া ট্রিপ",
+      "visitor_trips": "অতিথির ট্রিপ",
+      "open_alerts_now": "এখন খোলা সতর্কতা",
+      "trips_waiting_for_admin_approval_now": "এখন অনুমোদনের অপেক্ষায়",
+      "trips_running_now": "এখন চলমান ট্রিপ",
+      "by_department": "বিভাগ অনুযায়ী",
+      "by_passenger": "যাত্রী অনুযায়ী",
+      "busiest_cars": "সবচেয়ে ব্যস্ত গাড়ি",
+      "top_departments": "শীর্ষ বিভাগ",
+      "cancelled_trip": "বাতিল ট্রিপ",
+      "needs_review_passenger_could_not_scan": "যাচাই দরকার (যাত্রী স্ক্যান করতে পারেননি)",
+      "no_passenger": "যাত্রী নেই",
+      "km_gap": "কিমি ফাঁক",
+      "long_trip": "লম্বা ট্রিপ",
+      "high_km": "বেশি কিমি",
+      "wrong_ids_qr_blocked": "ভুল আইডি (QR বন্ধ)",
+      "waiting_too_long": "অনেকক্ষণ অপেক্ষা",
+      "visitor": "অতিথি",
+      "no_department": "বিভাগ নেই",
+      "yes": "হ্যাঁ",
+      "open": "খোলা",
+      "solved": "সমাধান হয়েছে",
+      "pending": "অপেক্ষমাণ",
+      "approved": "অনুমোদিত",
+      "rejected": "বাতিল করা হয়েছে"
     }
   }
 }
