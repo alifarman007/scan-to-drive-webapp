@@ -151,6 +151,9 @@ class Trip(Base):
     # The passenger's phone is remembered after the start (a cookie holds the key, only its hash is here),
     # so the same phone can confirm the end with one tap.
     passenger_key_hash: Mapped[str | None] = mapped_column(String(64))
+    # Trips brought in from the old travel-log forms (app/services/old_trips.py): which import, and which form row.
+    import_batch: Mapped[str | None] = mapped_column(String(32), index=True)
+    import_key: Mapped[str | None] = mapped_column(String(60), unique=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

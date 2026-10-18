@@ -4,6 +4,7 @@ import {
   ArrowRightIcon,
   CaretLeftIcon,
   CaretRightIcon,
+  ClockCounterClockwiseIcon,
   EyeIcon,
   FunnelSimpleXIcon,
   MagnifyingGlassIcon,
@@ -158,6 +159,12 @@ export function TripHistory({
             onClick={() => go({ review: !filters.review })}
             icon={<EyeIcon size={16} weight="bold" />}
             label={t("filter.officeCheck")}
+          />
+          <Toggle
+            pressed={filters.imported}
+            onClick={() => go({ imported: !filters.imported })}
+            icon={<ClockCounterClockwiseIcon size={16} weight="bold" />}
+            label={t("filter.imported")}
           />
           <AnimatePresence>
             {hasFilters(filters) ? (
@@ -479,7 +486,7 @@ function TripRow({ trip }: { trip: HistoryTrip }) {
           <span>{format.dateTime(started, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
           {trip.distance_km !== null ? <span className="font-semibold text-title tabular-nums">{trip.distance_km} km</span> : null}
           {seconds !== null ? <span>{duration(seconds)}</span> : null}
-          <Flags pending={pending} review={trip.needs_review} />
+          <Flags pending={pending} review={trip.needs_review} imported={trip.imported} />
         </div>
       </div>
 
@@ -504,14 +511,21 @@ function TripRow({ trip }: { trip: HistoryTrip }) {
       </span>
       <span className="hidden flex-col items-start gap-1 lg:flex">
         <TripStatusChip status={trip.status} />
-        <Flags pending={pending} review={trip.needs_review} />
+        <Flags pending={pending} review={trip.needs_review} imported={trip.imported} />
       </span>
     </Link>
   );
 }
 
-function Flags({ pending, review }: { pending: boolean; review: boolean }) {
+function Flags({ pending, review, imported }: { pending: boolean; review: boolean; imported?: boolean }) {
   const t = useTranslations("trips");
+  if (imported)
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted">
+        <ClockCounterClockwiseIcon size={13} weight="bold" />
+        {t("flags.imported")}
+      </span>
+    );
   if (!pending && !review) return null;
   return (
     <span className="inline-flex items-center gap-2 text-xs font-semibold">

@@ -3,6 +3,7 @@
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
+  ClockCounterClockwiseIcon,
   HandshakeIcon,
   IdentificationBadgeIcon,
   InfoIcon,
@@ -98,6 +99,14 @@ export function TripDetailView({ data }: { data: TripDetail }) {
         ) : null}
       </AnimatePresence>
 
+      {trip.imported ? (
+        <Reveal className="flex items-start gap-3 rounded-2xl border border-dashed border-border-strong bg-soft/60 px-4 py-3 text-sm text-title">
+          <ClockCounterClockwiseIcon size={20} weight="duotone" className="mt-px shrink-0 text-accent" />
+          <span>
+            <b className="font-bold">{t("imported.title")}</b> {t("imported.body")}
+          </span>
+        </Reveal>
+      ) : null}
       <Notices trip={trip} />
 
       <div className="grid gap-section xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">

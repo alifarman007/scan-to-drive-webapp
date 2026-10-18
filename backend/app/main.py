@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.deps import get_db
-from app.routers import admin_alerts, admin_cars, admin_people, admin_reports, admin_settings, admin_trips, admin_users, admin_views, auth, cars, passenger, trips
+from app.routers import admin_alerts, admin_cars, admin_import, admin_people, admin_reports, admin_settings, admin_trips, admin_users, admin_views, auth, cars, passenger, trips
 
 app = FastAPI(
     title="Scan-to-Drive API",
@@ -38,6 +38,7 @@ app.include_router(admin_users.router, prefix="/api")
 app.include_router(admin_settings.router, prefix="/api")
 app.include_router(admin_settings.public, prefix="/api")
 app.include_router(admin_reports.router, prefix="/api")
+app.include_router(admin_import.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["system"])

@@ -55,6 +55,7 @@ export function Timeline({ events, visitorName }: { events: TimelineEvent[]; vis
         <h2 className="font-display text-lg font-semibold text-title">{t("title")}</h2>
         <span className="text-sm text-muted">{t("count", { count: events.length })}</span>
       </div>
+      {events.length === 0 ? <p className="rounded-2xl bg-soft px-4 py-3 text-sm text-muted">{t("none")}</p> : null}
       <ol className="relative flex flex-col">
         {events.map((e, i) => {
           const day = days[i];

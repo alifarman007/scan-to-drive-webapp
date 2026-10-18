@@ -222,7 +222,7 @@ def dashboard(_: AdminUser = Depends(current_admin_user), db: Session = Depends(
 
 # ---- trip history ------------------------------------------------------------------------------
 
-def _filtered(stmt, *, q, status, car_id, driver_id, department, approval, needs_review, start, end):
+def _filtered(stmt, *, q, status, car_id, driver_id, department, approval, needs_review, start, end, imported=None):
     if start is not None:
         stmt = stmt.where(Trip.start_time >= start)
     if end is not None:
@@ -239,6 +239,8 @@ def _filtered(stmt, *, q, status, car_id, driver_id, department, approval, needs
         stmt = stmt.where(Trip.approval_status == approval)
     if needs_review is not None:
         stmt = stmt.where(Trip.needs_review == needs_review)
+    if imported is not None:
+        stmt = stmt.where(Trip.import_batch.is_not(None) if imported else Trip.import_batch.is_(None))
     if q and q.strip():
         term = q.strip()
         stmt = stmt.where(or_(*[c.icontains(term, autoescape=True) for c in (
@@ -257,6 +259,7 @@ def trip_history(
     department: str | None = Query(None, max_length=120),
     approval: Literal["pending", "approved", "rejected"] | None = None,
     needs_review: bool | None = None,
+    imported: bool | None = Query(None, description="true: only trips imported from the old forms; false: only app trips"),
     limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
     _: AdminUser = Depends(current_admin_user), db: Session = Depends(get_db),
 ):
@@ -268,7 +271,7 @@ def trip_history(
         date_from, date_to = preset_range(range, today_local())
     start, end = range_bounds(date_from, date_to)
     flt = dict(q=q, status=status, car_id=car_id, driver_id=driver_id, department=department,
-               approval=approval, needs_review=needs_review, start=start, end=end)
+               approval=approval, needs_review=needs_review, start=start, end=end, imported=imported)
 
     base = select(Trip).join(Driver, Driver.id == Trip.driver_id).join(Vehicle, Vehicle.id == Trip.vehicle_id) \
         .outerjoin(Passenger, Passenger.id == Trip.passenger_id)

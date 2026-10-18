@@ -676,7 +676,8 @@
       "carGroup": {
         "epic": "Epic cars",
         "vendor": "Vendor cars"
-      }
+      },
+      "imported": "From old forms"
     },
     "columns": {
       "trip": "Trip",
@@ -692,7 +693,8 @@
     "visitor": "Visitor",
     "flags": {
       "approval": "Needs approval",
-      "check": "Office to check"
+      "check": "Office to check",
+      "imported": "Old form"
     },
     "pages": {
       "label": "Pages",
@@ -887,7 +889,12 @@
         "qr_blocked": "QR blocked",
         "alert_solved": "Alert solved",
         "trip_reviewed": "Passenger rated the trip"
-      }
+      },
+      "none": "No steps recorded: this trip came from the old travel-log form."
+    },
+    "imported": {
+      "title": "Imported from the old form.",
+      "body": "No dashboard photos, QR confirmations or GPS: the km and places are as the driver typed them in the old travel log."
     }
   },
   "dock": {
@@ -1409,5 +1416,65 @@
     "errorBody": "This page hit a bump. Try again; if it keeps happening, tell the transport office.",
     "tryAgain": "Try again",
     "code": "Code: {digest}"
+  },
+  "oldImport": {
+    "eyebrow": "Admin · hidden page",
+    "title": "Import old trips",
+    "intro": "Bring in the trips from the old travel-log forms. Export the Driver Travel Log (and the Passenger Travel Log) as CSV and drop them here. Starts and ends are paired by number plate; you see everything before anything is saved.",
+    "driverLog": "Driver Travel Log",
+    "driverHint": "CSV export, needed",
+    "passengerLog": "Passenger Travel Log",
+    "passengerHint": "CSV export: passenger IDs and ratings",
+    "optional": "optional",
+    "choose": "Choose file",
+    "change": "Choose another",
+    "remove": "Remove file",
+    "safe": "Reading the files changes nothing. You choose what to import next.",
+    "read": "Read the files",
+    "show": "Show",
+    "all": "All",
+    "none": "None",
+    "group": {
+      "ready": "Ready",
+      "test": "Looks like a test",
+      "no": "Cannot import",
+      "done": "Already imported"
+    },
+    "testNote": "Made while the forms were being tried out (\"test\" in the text, tiny or huge km, ended within minutes). Not ticked; tick any that are real.",
+    "noNote": "These cannot go in as they are: no end, km going backwards, an unknown plate, or the same time as a trip already in the app.",
+    "emptyGroup": "Nothing here.",
+    "skipped": "{count, plural, one {# row} other {# rows}} that are not trips",
+    "includeTrip": "Import {key}",
+    "chooseDriver": "Choose the driver",
+    "whoIs": "Who is \"{name}\"?",
+    "typed": "typed \"{name}\"",
+    "passengerId": "Passenger {id}",
+    "visitor": "Visitor (not an employee)",
+    "passengerNoId": "Passenger, no valid ID",
+    "chosen": "{count, plural, =0 {Nothing chosen} one {# trip to import} other {# trips to import}}",
+    "chosenKm": "{km} km in total",
+    "back": "Back",
+    "import": "Import",
+    "doneTitle": "{count, plural, one {# trip imported} other {# trips imported}}",
+    "doneBody": "{km} km, from {from} to {to}. Each car's km moved forward to its latest reading.",
+    "doneRefused": "{count, plural, one {# trip was left out} other {# trips were left out}} (they changed meanwhile).",
+    "seeTrips": "See them in Trip history",
+    "another": "Import more",
+    "earlier": "Earlier imports",
+    "batchLine": "{count, plural, one {# trip} other {# trips}} · {km} km",
+    "batchMeta": "Trips {from} – {to} · by {by} on {at}",
+    "undo": "Undo",
+    "undoTitle": "Undo this import?",
+    "undoBody": "{count, plural, one {Its # trip and rating are removed} other {Its # trips and their ratings are removed}}. The cars' km go back. Trips made in the app are not touched.",
+    "keep": "Keep it",
+    "undoConfirm": "Undo import",
+    "undone": "{count, plural, one {# trip removed} other {# trips removed}}",
+    "adminsOnly": "Only for admins",
+    "adminsOnlyBody": "Importing old trips is done by an admin.",
+    "toDashboard": "Dashboard",
+    "errors": {
+      "network": "No connection. Try again.",
+      "generic": "Something went wrong. Try again."
+    }
   }
 }

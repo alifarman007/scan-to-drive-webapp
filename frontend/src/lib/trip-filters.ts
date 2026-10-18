@@ -27,6 +27,7 @@ export type Filters = {
   dept: string;
   approval: string; // "pending" | "approved" | "rejected" | ""
   review: boolean;
+  imported: boolean;
   page: number;
 };
 
@@ -54,6 +55,7 @@ export function readFilters(sp: Params): Filters {
     dept: one(sp.dept).slice(0, 120),
     approval: ["pending", "approved", "rejected"].includes(approval) ? approval : "",
     review: one(sp.review) === "1",
+    imported: one(sp.imported) === "1",
     page: Number.isInteger(page) && page > 1 ? page : 1,
   };
 }
@@ -74,6 +76,7 @@ export function apiQuery(f: Filters): string {
   if (f.dept) p.set("department", f.dept);
   if (f.approval) p.set("approval", f.approval);
   if (f.review) p.set("needs_review", "true");
+  if (f.imported) p.set("imported", "true");
   p.set("limit", String(PAGE_SIZE));
   p.set("offset", String((f.page - 1) * PAGE_SIZE));
   return p.toString();
@@ -92,15 +95,16 @@ export function pageHref(f: Filters): string {
   if (f.dept) p.set("dept", f.dept);
   if (f.approval) p.set("approval", f.approval);
   if (f.review) p.set("review", "1");
+  if (f.imported) p.set("imported", "1");
   if (f.page > 1) p.set("page", String(f.page));
   const s = p.toString();
   return s ? `/admin/trips?${s}` : "/admin/trips";
 }
 
 export function hasFilters(f: Filters) {
-  return Boolean(f.q || f.range || f.status || f.car || f.driver || f.dept || f.approval || f.review);
+  return Boolean(f.q || f.range || f.status || f.car || f.driver || f.dept || f.approval || f.review || f.imported);
 }
 
 export const NO_FILTERS: Filters = {
-  q: "", range: "", from: "", to: "", status: "", car: "", driver: "", dept: "", approval: "", review: false, page: 1,
+  q: "", range: "", from: "", to: "", status: "", car: "", driver: "", dept: "", approval: "", review: false, imported: false, page: 1,
 };

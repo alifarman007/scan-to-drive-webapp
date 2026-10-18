@@ -973,6 +973,52 @@ Frontend:
 - [ ] To verify on the laptop: sign out and sign in again to see the entrance; hover "See all" on the dashboard; reinstall the app
       icon on a phone (remove the old home-screen icon first).
 
+### 2026-10-18 (import old trips from the travel-log forms: hidden admin page)
+
+Got the old forms' data as CSV: "Driver Travel Log" (a Start row and an End row per trip, no link between them) and
+"Passenger Travel Log" (passenger ID at the start, rating and comment at the end). The old "Car 01" numbers do not match
+the app's car codes, so cars are matched by number plate.
+
+Backend (migration 0008):
+- [x] `trips.import_batch` and `trips.import_key` (the form rows a trip came from, unique, so a row is never imported twice).
+      Trip API: `imported` on every trip; trip history filter `imported=true|false`.
+- [x] `app/services/old_trips.py` reads the two CSV files:
+  - the rows of each car (found by plate, written any way: `DM GA -27-6992`, `DM-GA-16-2066` ...) in time order; every End is
+    paired with the Start just before it on the same car;
+  - the driver by name: "Md." ignored, "Liton" finds "Md. Sirajul Islam (Liton)", "Mizan" finds "Mizanur", small spelling
+    differences allowed ("ShaAlom" / "ShaAlam"), "Salim (2)" is "Selim-2"; two drivers with the same name (the two Md. Shariful
+    Islam, Md. Rashed / Rashed) are told apart by the car they usually drive, otherwise the admin chooses;
+  - the passenger form joined through its "Driver Record ID": the first valid 7-digit employee ID, the rating and comment;
+    other typed IDs ("HK", "123456") are kept as a note on the trip;
+  - times from the form are Bangladesh time.
+- [x] Every trip found is "Ready", "Looks like a test" ("test" in the text, a start km under 1,000, made-up km like 123,456 or
+      9999, more than 1,500 km, ended within 2 minutes), "Cannot import" (never ended, end km not above start km, unknown plate,
+      the same time as a trip already in the app, driver not clear) or "Already imported".
+- [x] `/api/admin/import/old-trips/preview` (nothing saved), `/api/admin/import/old-trips` (the chosen trips, with the driver chosen
+      for unclear names), `/api/admin/import/batches` and `DELETE /api/admin/import/batches/{batch}` (undo one import). Admins only.
+- [x] Imported trips are completed trips with no photos, QR confirmations or GPS; no alerts are raised. The passenger is linked (and
+      added to the employees if new); the rating goes in as a review. A trip without a passenger form says "Not recorded (old form)".
+      Each car's km moves forward to its latest end km (never back). Undo removes the trips and ratings and puts the cars' km back.
+      Every import and undo is in the audit log.
+- [x] With the files from 18 Oct in the sandbox: 123 trips found, 37 ready (2,806 km), 20 tests, 66 that cannot go in (mostly
+      starts that never got an end), 2 ends without a start.
+- [x] 335 tests pass (11 new in `tests/test_old_trips.py`).
+
+Frontend:
+- [x] Hidden page **/admin/import** (not in the menu; viewers see "Only for admins"): drop the two CSV files, "Read the files",
+      then four cards (Ready, Looks like a test, Cannot import, Already imported) with km, and every trip with car, plate, driver
+      (and what the form said), times, places, km, passenger, stars and the reasons. Ready trips are ticked, tests are not
+      (tick any that are real); a "Who is ...?" list for unclear drivers. A bar at the bottom: "37 trips to import · 2,806 km",
+      Import. Then a done screen with a link to the imported trips, and "Earlier imports" with Undo.
+- [x] Trip history: "From old forms" filter and an "Old form" mark on those trips. Trip page: "Imported from the old form" note,
+      "No photo" boxes, and the timeline says the old form has no steps.
+- [x] All new texts in English and Bangla.
+- [x] Checked in the sandbox with the real files: read, the four groups, choose a driver, import 37, history filter, trip page, read
+      again (all show as already imported), undo and import again; laptop and phone. No browser errors. Lint, types and build pass.
+- [ ] To do on the laptop: `python -m alembic upgrade head` (0008), open `/admin/import`, drop the two exports, check the "Looks like
+      a test" and "Cannot import" groups, import. Export again later for the trips still running in the old form: rows already
+      imported are skipped.
+
 ## Database (PDF section 16)
 
 Tables: `vehicles`, `drivers`, `passengers`, `admin_users`, `trips`, `trip_photos`, `trip_tokens`,
@@ -1005,6 +1051,7 @@ completed trips locked except admin corrections with a reason; never delete cars
 - `trips.passenger_key_hash` (the phone that confirmed the start), `trip_reviews` (passenger rating), `passengers.name` optional (migration 0005).
 - `trip_photos.width`, `height`, `size_bytes`, `original_bytes`, `sha256` (photo details and fingerprint, migration 0006).
 - `vendors` (companies that rent cars to Epic), `vehicles.owner` (`epic` / `vendor`) and `vehicles.vendor_id` (migration 0007).
+- `trips.import_batch`, `trips.import_key` (trips imported from the old travel-log forms, migration 0008).
 - `created_at` / `updated_at` columns on most tables.
 
 ### Assumptions to confirm
@@ -1135,6 +1182,10 @@ npm run start:lan             # run the production build for phones (faster than
 | POST | `/api/admin/vendors` | admin | add a vendor |
 | PATCH | `/api/admin/vendors/{id}` | admin | rename a vendor |
 | DELETE | `/api/admin/vendors/{id}` | admin | remove a vendor that has no cars |
+| POST | `/api/admin/import/old-trips/preview` | admin | read the old Driver / Passenger Travel Log CSVs: trips found, what is wrong, nothing saved |
+| POST | `/api/admin/import/old-trips` | admin | import the chosen old trips (`choices`: which, and drivers for unclear names) |
+| GET | `/api/admin/import/batches` | admin | earlier imports |
+| DELETE | `/api/admin/import/batches/{batch}` | admin | undo one import |
 | POST | `/api/admin/cars/{id}/new-sticker` | admin | new sticker version; the old sticker stops working |
 | GET | `/api/admin/cars/{id}/qr.pdf` | admin | printable QR sticker (`layout=sticker` or `a4`) |
 | GET | `/api/admin/drivers` | admin / viewer | driver list with totals, ratings and the next free driver ID; `/{id}` adds last trips and km per day |
@@ -1182,7 +1233,8 @@ README.md                  this file
 docs/                      the project plan PDF
 backend/
   alembic.ini, alembic/    migrations (0001_initial_schema, 0002_visitor_passengers, 0003_cant_scan_approval, 0004_settings_value_text,
-                           0005_typed_passengers_reviews, 0006_photo_details, 0007_vendors)
+                           0005_typed_passengers_reviews, 0006_photo_details, 0007_vendors,
+                           0008_imported_trips)
   app/config.py            settings from backend/.env
   app/db.py                engine, session, Base, naming convention
   app/models/              SQLAlchemy models (enums, vehicle, people, trip, audit)
@@ -1204,6 +1256,8 @@ backend/
   app/services/reports.py  the seven reports; app/services/report_export.py Excel and PDF files
   app/services/people_import.py reads the passenger Excel sheet
   app/services/stickers.py car QR sticker PDF (qrcode + reportlab)
+  app/services/old_trips.py reads the old travel-log CSVs (pairs starts and ends, matches cars and drivers)
+  app/routers/admin_import.py import old trips: preview, import, undo
   app/services/photos.py   cleans every dashboard photo (upright, 2048 px, JPEG 88, no hidden data, fingerprint)
   app/services/timeutil.py Bangladesh days for dashboards and filters
   app/services/            audit log, alert checks (jobs.py), settings lookup, QR tokens, QR checks and wrong-ID lock (qr_access.py), trip rules,
@@ -1235,6 +1289,7 @@ backend/
   tests/test_end_trip.py   end form, End QR, end confirmation, visitor phone rule
   tests/test_photos.py     photo cleaning and the same photo used twice
   tests/test_fleet_data.py the real fleet lists (plates, models, IDs)
+  tests/test_old_trips.py  reading and importing the old travel-log forms
 frontend/                  Next.js app
   messages/en.json, bn.json  all texts, English and Bangla
   src/app/globals.css      colours (light and dark), fonts, fluid sizes
@@ -1253,7 +1308,7 @@ frontend/                  Next.js app
   src/components/passenger/identity-forms.tsx "who are you" forms (employee ID + optional name, visitor), used on both pages
   src/proxy.ts             admin pages without a session cookie go to /admin/login?next=...
   src/app/admin/login/     admin sign-in page; src/app/admin/(panel)/ every page behind sign-in (layout checks the session)
-  src/components/admin/office/ users page (users.tsx) and settings page (settings.tsx)
+  src/components/admin/office/ users page (users.tsx), settings page (settings.tsx), import old trips (import-old.tsx, page /admin/import)
   src/components/admin/fleet/ cars, drivers and alerts pages (cars.tsx, drivers.tsx, alerts.tsx) and their shared pieces (shared.tsx)
   src/components/admin/dashboard/ live dashboard: numbers, car board, alerts (solve), passenger ratings, trips running now, two charts
   src/app/admin/(panel)/trips/ trip history (filters in the address) and trips/[id] trip detail

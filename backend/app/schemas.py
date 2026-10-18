@@ -34,4 +34,5 @@ def trip_out(trip: Trip) -> dict:
         "end_no_scan_reason": trip.end_no_scan_reason,
         "approval_note": trip.approval_note,
         "approved_at": trip.approved_at,
+        "imported": trip.import_batch is not None,  # from the old forms: no photos, no QR confirmations
     }

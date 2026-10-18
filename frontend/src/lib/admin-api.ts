@@ -205,6 +205,8 @@ export type HistoryTrip = LiveTrip & {
   reg_number: string;
   /** the passenger's star rating, if they gave one */
   rating?: number | null;
+  /** brought in from the old travel-log forms (no photos, no QR confirmations) */
+  imported?: boolean;
 };
 
 export type TripPage = { total: number; total_km: number; limit: number; offset: number; trips: HistoryTrip[] };
